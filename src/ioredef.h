@@ -25,9 +25,10 @@
 #include <errno.h>
 #include <mpi.h>
 
+#include <sys/param.h>                               
+
 /* TODO: check the need for these includes and _WIN32 check */
 /*
-#include <sys/param.h>                               
 #include <unistd.h>
 #include <limits.h>
  */
