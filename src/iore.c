@@ -5,12 +5,76 @@
 
 #include "iore.h"
 #include "util.h"
+#include "ioreaio.h"
+#include "parseopt.h"
+
+/*****************************************************************************
+ * P R O T O T Y P E S                                                       *
+ *****************************************************************************/
+
+static void usage(char **argv);
+static void display_splash();
+static void display_header(int argc, char **argv, int verbose);
+static IORE_test_t setup_tests(int argc, char **argv);
 
 /*****************************************************************************
  * V A R I A B L E S                                                         *
  *****************************************************************************/
 
+static int nprocs;
+static int rank;
 static int error_count = 0;
+
+/* TODO: use #ifdef to check compiled interfaces */
+static IORE_aio_t *available_ioreaio[] = {
+  &ioreaio_posix,
+  NULL
+};
+
+/*****************************************************************************
+ * M A I N                                                                   *
+ *****************************************************************************/
+
+int main(int argc, char **argv)
+{
+  IORE_test_t tests;
+  
+  /* check for the -h or --help options (display usage) in the command
+     line before starting MPI. */
+  int i;
+  for (i = 1; i < argc; i++) {
+    if (STREQUAL(argv[i], "-h") || STREQUAL(argv[i], "--help")) {
+      usage(argv);
+      exit(EXIT_SUCCESS);
+    }
+  }
+
+  display_splash();
+
+  /* check for compiled I/O backend */
+  if (available_ioreaio[0] == NULL) {
+    ERR("No I/O backends compiled for IORE.");
+    MPI_Abort(MPI_COMM_WORLD, -1);
+  }
+
+  /* start MPI */
+  IORE_MPI_CHECK(MPI_Init(&argc, &argv), "Cannot initialize MPI");
+  IORE_MPI_CHECK(MPI_Comm_size(MPI_COMM_WORLD, &nprocs),
+		 "Cannot get the number of MPI ranks");
+  IORE_MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank), "Cannot get rank");
+
+  /* setup tests based on command line arguments */
+  tests = setup_tests(argc, argv);
+
+  display_header(argc, argv, tests->params->verbose);
+
+  /* TODO: continue... */
+
+  /* finalize MPI */
+  IORE_MPI_CHECK(MPI_Finalize(), "Cannot finalize MPI");
+
+  return(error_count);
+}
 
 /*****************************************************************************
  * F U N C T I O N S                                                         *
@@ -18,9 +82,10 @@ static int error_count = 0;
 
 /*
  * Displays command line options and help.
+ * 
+ * **argv: command line arguments
  */
-static void
-usage(char **argv)
+static void usage(char **argv)
 {
   char *opts[] = {
     "OPTIONS:",
@@ -40,40 +105,42 @@ usage(char **argv)
   return;
 }
 
-
-/*****************************************************************************
- * M A I N                                                                   *
- *****************************************************************************/
-
-int
-main(int argc, char **argv)
+/*
+ * Displays the splash screen.
+ */
+static void display_splash()
 {
-  int nprocs;
-  int rank;
-  IORE_test_t *tests_head;
-  IORE_test_t *tests_current;
-  
-  /* check for the -h or --help options (display usage) in the command
-     line before starting MPI. */
-  int i;
-  for (i = 1; i < argc; i++) {
-    if (STREQUAL(argv[i], "-h") || STREQUAL(argv[i], "--help")) {
-      usage(argv);
-      exit(EXIT_SUCCESS);
-    }
-  }
+  /* TODO: include META_VERSION definition */
+  fprintf(stdout, "IORE %s - The IOR-Extended Benchmark\n\n", "TBA");
+  fflush(stdout);
+}
 
-  /* start MPI */
-  IORE_MPI_CHECK(MPI_Init(&argc, &argv), "Cannot initialize MPI");
-  IORE_MPI_CHECK(MPI_Comm_size(MPI_COMM_WORLD, &nprocs),
-		 "Cannot get the number of MPI ranks");
-  IORE_MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank), "Cannot get rank");
+/*
+ * Displays the output header.
+ *
+ * argc: number of arguments
+ * argv: array of arguments
+ * verbose: verbosity level
+ */
+static void display_header(int argc, char **argv, int verbose)
+{
+  /* TODO: implement */
+}
 
-  /* TODO: continue... */
-  fprintf(stdout, "Started MPI...\n");
+/*
+ * Setup tests based on command line arguments.
+ *
+ * argc: number of arguments
+ * argv: array of arguments
+ */
+static IORE_test_t setup_tests(int argc, char **argv)
+{
+  /* TODO: consider possibility of specifying multiple tests */
+  IORE_test_t tests;
 
-  /* finalize MPI */
-  IORE_MPI_CHECK(MPI_Finalize(), "Cannot finalize MPI");
+  tests = parse_cmd_line(argc, argv);
 
-  return(error_count);
+  /* TODO: implement */
+
+  return(tests_head);
 }
