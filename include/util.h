@@ -23,6 +23,9 @@
 #define NULL ((void *) 0)
 #endif
 
+#define MAX_STR 1024 /* max string length */
+#define MAX_RETRY 10000 /* max number of retries for POSIX I/O */
+
 /*****************************************************************************
  * D E C L A R A T I O N S                                                   *
  *****************************************************************************/
@@ -34,6 +37,14 @@ enum VERBOSE {
   VERBOSE_3 = 3,
   VERBOSE_4 = 4,
   VERBOSE_5 = 5
+};
+
+enum ACCESS {
+  WRITE,
+  WRITECHECK,
+  READ,
+  READCHECK,
+  CHECK
 };
 
 /*****************************************************************************
@@ -110,6 +121,28 @@ enum VERBOSE {
 	      __FILE__, __LINE__);					\
     }									\
     fflush(stdout);							\
+  } while(0)
+
+/*
+ * Displays a formatted warning message.
+ * 
+ * IORE_MSG_FORMAT: string format for printf
+ * VERBOSE: verbosity level
+ */
+#define WARNF(IORE_MSG_FMT, VERBOSE, ...) do {	\
+    char msg[MAX_STR];				\
+    sprintf(msg, IORE_MSG_FMT, __VA_ARGS__);	\
+    WARN(msg, VERBOSE);				\
+  } while(0)
+
+/*
+ * Displays a general message.
+ * 
+ * IORE_MSG_FMT: string format for printf
+ */
+#define INFO(IORE_MSG_FMT, ...) do {		\
+    fprintf(stdout, IORE_MSG_FMT, __VA_ARGS__); \
+    fflush(stdout);				\
   } while(0)
 
 #endif /* _UTIL_H */

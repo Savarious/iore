@@ -8,7 +8,7 @@ export CC = mpicc
 
 # Toolchain configuration
 export CFLAGS += -I $(INCDIR)
-export CFLAGS += -Wall -Wextra -Werror
+export CFLAGS += -Wall -Wextra
 
 # Executable file
 export EXEC = iore

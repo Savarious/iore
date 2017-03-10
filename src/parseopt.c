@@ -18,5 +18,6 @@
  */
 IORE_test_t *parse_cmd_line(int argc, char **argv)
 {
+  return (NULL);
   /* TODO: implement */
 }

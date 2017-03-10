@@ -11,9 +11,16 @@ typedef long long int IORE_offset_t;
 typedef long long int IORE_size_t;
 
 typedef struct {
-  int use_o_direct;
+  int use_o_direct; /* use O_DIRECT flag (bypass I/O buffers) */
+
+  IORE_offset_t offset; /* file offset for read/write */
   
   enum VERBOSE verbose;
+
+  /* POSIX parameters */
+  int fsync; /* fsync() after writing the whole file */
+  int fsync_per_write; /* fsync() after each write() */
+  int single_io_attempt; /* do not retry an I/O operation if incomplete */
 } IORE_param_t;
 
 typedef struct {
