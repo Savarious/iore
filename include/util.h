@@ -24,6 +24,19 @@
 #endif
 
 /*****************************************************************************
+ * D E C L A R A T I O N S                                                   *
+ *****************************************************************************/
+
+enum VERBOSE {
+  VERBOSE_0 = 0,
+  VERBOSE_1 = 1,
+  VERBOSE_2 = 2,
+  VERBOSE_3 = 3,
+  VERBOSE_4 = 4,
+  VERBOSE_5 = 5
+};
+
+/*****************************************************************************
  * M A C R O S                                                               *
  *****************************************************************************/
 
@@ -56,27 +69,47 @@
   } while(0)
   
 /*
- * Display a custom error message, the error number, and the error string.
+ * Displays a fatal error message and exit the program.
  *
- * IORE_MSG: custom error message
+ * IORE_MSG: custom message
  */
-#define ERR(IORE_MSG) do {						\
-    fprintf(stderr, "IORE ERROR: %s, errno %d, %s (%s:%d)\n",		\
+#define FATAL(IORE_MSG) do {						\
+    fprintf(stderr, "IORE FATAL: %s, errno %d, %s (%s:%d).\n",		\
 	    IORE_MSG, errno, strerror(errno), __FILE__, __LINE__);	\
     fflush(stderr);							\
+    MPI_Abort(MPI_COMM_WORLD, -1);					\
   } while(0)
 
-/*****************************************************************************
- * D E C L A R A T I O N S                                                   *
- *****************************************************************************/
+/*
+ * Displays an error message.
+ *
+ * IORE_MSG: custom message
+ * VERBOSE: verbosity level
+ */
+#define ERR(IORE_MSG, VERBOSE) do {					\
+    if (VERBOSE <= VERBOSE_2) {						\
+      fprintf(stderr, "IORE ERROR: %s, errno %d, %s.\n", IORE_MSG,	\
+	      errno, strerror(errno));					\
+    } else {								\
+      fprintf(stderr, "IORE ERROR: %s, errno %d, %s (%s:%d).\n",	\
+	      IORE_MSG, errno, strerror(errno), __FILE__, __LINE__);	\
+    }									\
+  } while(0)
 
-enum VERBOSE {
-  VERBOSE_0 = 0,
-  VERBOSE_1 = 1,
-  VERBOSE_2 = 2,
-  VERBOSE_3 = 3,
-  VERBOSE_4 = 4,
-  VERBOSE_5 = 5
-}
+/*
+ * Displays a warning message.
+ * 
+ * IORE_MSG: custom message
+ * VERBOSE: verbosity level
+ */
+#define WARN(IORE_MSG, VERBOSE) do {					\
+    if (VERBOSE <= VERBOSE_2) {						\
+      fprintf(stdout, "IORE WARNING: %s.\n", IORE_MSG);			\
+    } else {								\
+      fprintf(stdout, "IORE WARNING: %s, (%s:%d).\n", IORE_MSG,		\
+	      __FILE__, __LINE__);					\
+    }									\
+    fflush(stdout);							\
+  } while(0)
 
 #endif /* _UTIL_H */

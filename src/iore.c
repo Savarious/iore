@@ -58,8 +58,7 @@ int main(int argc, char **argv)
 
   /* check for compiled I/O backend */
   if (available_ioreaio[0] == NULL) {
-    ERR("No I/O backends compiled for IORE.");
-    MPI_Abort(MPI_COMM_WORLD, -1);
+    FATAL("No I/O backends compiled for IORE.");
   }
 
   IORE_MPI_CHECK(MPI_Init(&argc, &argv), "Cannot initialize MPI");
@@ -74,7 +73,7 @@ int main(int argc, char **argv)
 
   /* perform each test */
   IORE_test_t *test;
-  for (test = tests; test != NULL; test = test.next) {
+  for (test = tests; test != NULL; test = test->next) {
     if (rank == 0) {
       display_test_info(&test->params);
     }

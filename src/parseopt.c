@@ -16,7 +16,7 @@
  * argc: number of arguments
  * argv: array of arguments
  */
-IORE_test_t parse_cmd_line(int argc, char **argv)
+IORE_test_t *parse_cmd_line(int argc, char **argv)
 {
   /* TODO: implement */
 }

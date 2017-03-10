@@ -11,6 +11,8 @@ typedef long long int IORE_offset_t;
 typedef long long int IORE_size_t;
 
 typedef struct {
+  int use_o_direct;
+  
   enum VERBOSE verbose;
 } IORE_param_t;
 

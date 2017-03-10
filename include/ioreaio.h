@@ -7,12 +7,12 @@
 
 typedef struct IORE_aio_t {
   char *name;
-  void (*create)(char *, IORE_param_t *);
-  void (*open)(char *, IORE_param_t *);
+  void *(*create)(char *, IORE_param_t *);
+  void *(*open)(char *, IORE_param_t *);
   IORE_offset_t (*io)(int, void *, IORE_size_t *, IORE_offset_t,
 		      IORE_param_t *);
   void (*close)(void *, IORE_param_t *);
-  void (*delete)(char *, IORE_param_t *);
+  void (*delete)(char *, int, IORE_param_t *);
 } IORE_aio_t;
 
 /*****************************************************************************
