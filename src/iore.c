@@ -14,8 +14,13 @@
 
 static void usage(char **argv);
 static void display_splash();
-static void display_header(int argc, char **argv, int verbose);
-static IORE_test_t setup_tests(int argc, char **argv);
+static void display_header(int argc, char **argv, enum VERBOSE verbose);
+static void display_test_info(IORE_param_t *params);
+static void display_summary(IORE_test_t *tests);
+static void display_footer();
+static IORE_test_t *setup_tests(int argc, char **argv);
+static void run(IORE_test_t *test);
+static void finalize(IORE_test_t *tests);
 
 /*****************************************************************************
  * V A R I A B L E S                                                         *
@@ -37,7 +42,7 @@ static IORE_aio_t *available_ioreaio[] = {
 
 int main(int argc, char **argv)
 {
-  IORE_test_t tests;
+  IORE_test_t *tests;
   
   /* check for the -h or --help options (display usage) in the command
      line before starting MPI. */
@@ -57,7 +62,6 @@ int main(int argc, char **argv)
     MPI_Abort(MPI_COMM_WORLD, -1);
   }
 
-  /* start MPI */
   IORE_MPI_CHECK(MPI_Init(&argc, &argv), "Cannot initialize MPI");
   IORE_MPI_CHECK(MPI_Comm_size(MPI_COMM_WORLD, &nprocs),
 		 "Cannot get the number of MPI ranks");
@@ -66,11 +70,24 @@ int main(int argc, char **argv)
   /* setup tests based on command line arguments */
   tests = setup_tests(argc, argv);
 
-  display_header(argc, argv, tests->params->verbose);
+  display_header(argc, argv, tests->params.verbose);
 
-  /* TODO: continue... */
+  /* perform each test */
+  IORE_test_t *test;
+  for (test = tests; test != NULL; test = test.next) {
+    if (rank == 0) {
+      display_test_info(&test->params);
+    }
 
-  /* finalize MPI */
+    run(test);
+  }
+
+  display_summary(tests);
+
+  display_footer();
+
+  finalize(tests);
+
   IORE_MPI_CHECK(MPI_Finalize(), "Cannot finalize MPI");
 
   return(error_count);
@@ -116,13 +133,41 @@ static void display_splash()
 }
 
 /*
- * Displays the output header.
+ * Displays the initial header (e.g., command line used, machine name, etc.).
  *
  * argc: number of arguments
  * argv: array of arguments
  * verbose: verbosity level
  */
-static void display_header(int argc, char **argv, int verbose)
+static void display_header(int argc, char **argv, enum VERBOSE verbose)
+{
+  /* TODO: implement */
+}
+
+/*
+ * Displays the test information.
+ *
+ * params: test parameters
+ */
+static void display_test_info(IORE_param_t *params)
+{
+  /* TODO: implement */
+}
+
+/*
+ * Displays a summary of all tests.
+ *
+ * tests: tests list
+ */
+static void display_summary(IORE_test_t *tests)
+{
+  /* TODO: implement */
+}
+
+/*
+ * Displays concluding information.
+ */
+static void display_footer()
 {
   /* TODO: implement */
 }
@@ -133,14 +178,30 @@ static void display_header(int argc, char **argv, int verbose)
  * argc: number of arguments
  * argv: array of arguments
  */
-static IORE_test_t setup_tests(int argc, char **argv)
+static IORE_test_t *setup_tests(int argc, char **argv)
 {
   /* TODO: consider possibility of specifying multiple tests */
-  IORE_test_t tests;
+  IORE_test_t *tests;
 
   tests = parse_cmd_line(argc, argv);
 
   /* TODO: implement */
 
-  return(tests_head);
+  return(tests);
+}
+
+/*
+ * Execute iterations of a single test.
+ */
+static void run(IORE_test_t *test)
+{
+  /* TODO: implement */
+}
+
+/*
+ * Execute finalizing actions (e.g., destroy tests, etc.).
+ */
+static void finalize(IORE_test_t *test)
+{
+  /* TODO: implement */
 }
