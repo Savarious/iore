@@ -23,6 +23,10 @@
 #define NULL ((void *) 0)
 #endif
 
+#ifndef MASTER_RANK
+#define MASTER_RANK 0
+#endif
+
 #define MAX_STR 1024 /* max string length */
 #define MAX_RETRY 10000 /* max number of retries for POSIX I/O */
 
@@ -43,8 +47,12 @@ enum ACCESS {
   WRITE,
   WRITECHECK,
   READ,
-  READCHECK,
-  CHECK
+  READCHECK
+};
+
+enum SHARING_POLICY {
+  SHARED_FILE,
+  FILE_PER_PROCESS
 };
 
 /*****************************************************************************
@@ -140,7 +148,7 @@ enum ACCESS {
  * 
  * IORE_MSG_FMT: string format for printf
  */
-#define INFO(IORE_MSG_FMT, ...) do {		\
+#define INFOF(IORE_MSG_FMT, ...) do {		\
     fprintf(stdout, IORE_MSG_FMT, __VA_ARGS__); \
     fflush(stdout);				\
   } while(0)

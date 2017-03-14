@@ -147,7 +147,7 @@ static IORE_offset_t posix_io(enum ACCESS access, void *file, IORE_size_t *buf,
   while (remainder > 0) {
     if (access == WRITE) {
       if (verbose >= VERBOSE_4) {
-	INFO("Task %d writing to offset %lld\n", rank,
+	INFOF("Task %d writing to offset %lld\n", rank,
 	     p->offset + length - remainder);
       }
       n = write(fd, b, remainder);
@@ -157,9 +157,9 @@ static IORE_offset_t posix_io(enum ACCESS access, void *file, IORE_size_t *buf,
       if (p->fsync_per_write == TRUE) {
 	posix_fsync(&fd, p);
       }
-    } else { /* READ */
+    } else { /* READ or CHECK */
       if (verbose >= VERBOSE_4) {
-	INFO("Task %d reading from offset %lld\n", rank,
+	INFOF("Task %d reading from offset %lld\n", rank,
 	     p->offset + length - remainder);
       }
       n = read(fd, b, remainder);
