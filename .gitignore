@@ -36,4 +36,4 @@
 *~
 
 # Compilation files
-bin/*
+/bin/

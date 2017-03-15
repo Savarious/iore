@@ -39,7 +39,7 @@
 
 static void *posix_create(char *, IORE_param_t *);
 static void *posix_open(char *, IORE_param_t *);
-static IORE_offset_t posix_io(enum ACCESS, void *, IORE_size_t *, IORE_offset_t,
+static IORE_size_t posix_io(enum ACCESS, void *, IORE_size_t *, IORE_size_t,
 			      IORE_param_t *, int); 
 static void posix_close(void *, IORE_param_t *);
 static void posix_delete(char *, int, IORE_param_t *);
@@ -77,7 +77,7 @@ static void *posix_create(char *file_name, IORE_param_t *p)
   
   fd = (int *) malloc(sizeof(int));
   if (fd == NULL) {
-    FATAL("Unable to allocate memory to file descriptor.");
+    FATAL("Failed to allocate memory to file descriptor.");
   }
   
   if (p->use_o_direct) {
@@ -105,7 +105,7 @@ static void *posix_open(char *file_name, IORE_param_t *p)
   
   fd = (int *) malloc(sizeof(int));
   if (fd == NULL) {
-    FATAL("Unable to allocate memory to file descriptor.");
+    FATAL("Failed to allocate memory to file descriptor.");
   }
   
   if (p->use_o_direct) {
@@ -130,8 +130,8 @@ static void *posix_open(char *file_name, IORE_param_t *p)
  * p: test parameters
  * rank: MPI rank
  */
-static IORE_offset_t posix_io(enum ACCESS access, void *file, IORE_size_t *buf,
-			      IORE_offset_t length, IORE_param_t *p, int rank)
+static IORE_size_t posix_io(enum ACCESS access, void *file, IORE_size_t *buf,
+			      IORE_size_t length, IORE_param_t *p, int rank)
 {
   long long n;
   int retries = 0;
@@ -219,7 +219,7 @@ static void posix_delete(char *file_name, int rank, IORE_param_t *p)
 {
   if (unlink(file_name) != 0) {
     char msg[256];
-    sprintf(msg, "[RANK %03d]: Unable to unlink file \"%s\".\n", rank,
+    sprintf(msg, "[RANK %03d]: Failed to unlink file \"%s\".\n", rank,
 	    file_name);
     ERR(msg, p->verbose);
   }  

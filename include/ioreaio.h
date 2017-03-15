@@ -11,7 +11,7 @@ typedef struct IORE_aio_t {
   char *name;
   void *(*create)(char *, IORE_param_t *);
   void *(*open)(char *, IORE_param_t *);
-  IORE_offset_t (*io)(enum ACCESS, void *, IORE_size_t *, IORE_offset_t,
+  IORE_size_t (*io)(enum ACCESS, void *, IORE_size_t *, IORE_size_t,
 		      IORE_param_t *, int);
   void (*close)(void *, IORE_param_t *);
   void (*delete)(char *, int, IORE_param_t *);

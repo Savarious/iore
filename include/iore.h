@@ -6,12 +6,33 @@
 #include "util.h"
 
 /*****************************************************************************
+ * D E F I N I T I O N S                                                     *
+ *****************************************************************************/
+
+/* Timer array constants; W for write and R for read*/
+#define W_OPEN_START 0
+#define W_OPEN_STOP 1
+#define W_START 2
+#define W_STOP 3
+#define W_CLOSE_START 4
+#define W_CLOSE_STOP 5
+#define R_OPEN_START 6
+#define R_OPEN_STOP 7
+#define R_START 8
+#define R_STOP 9
+#define R_CLOSE_START 10
+#define R_CLOSE_STOP 11
+
+/*****************************************************************************
  * T Y P E S   A N D   S T R U C T S                                         *
  *****************************************************************************/
 
 typedef long long int IORE_offset_t;
 typedef long long int IORE_size_t;
 
+/*
+ * Test parameters.
+ */
 typedef struct {
   char api[MAX_STR]; /* API for I/O */
   int num_tasks; /* number of tasks for test */
@@ -27,6 +48,8 @@ typedef struct {
   int use_existing_test_file; /* do not remove test file before the test */
 
   int intra_test_delay; /* delay in seconds among tests and repetitions */
+  int intra_test_sync; /* synchronize tasks between open and write/read and
+			  between write/read and close */
   int max_time_per_test; /* max time in seconds to run each test */
   int repetitions; /* number of repetitions of the test */
   
