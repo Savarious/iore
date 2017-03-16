@@ -37,3 +37,6 @@
 
 # Compilation files
 /bin/
+/.settings/
+/.cproject
+/.project

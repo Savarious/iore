@@ -41,24 +41,20 @@ char *get_time_string();
  *****************************************************************************/
 
 enum VERBOSE {
-  VERBOSE_0 = 0,
-  VERBOSE_1 = 1,
-  VERBOSE_2 = 2,
-  VERBOSE_3 = 3,
-  VERBOSE_4 = 4,
-  VERBOSE_5 = 5
+	VERBOSE_0 = 0,
+	VERBOSE_1 = 1,
+	VERBOSE_2 = 2,
+	VERBOSE_3 = 3,
+	VERBOSE_4 = 4,
+	VERBOSE_5 = 5
 };
 
 enum ACCESS {
-  WRITE,
-  WRITECHECK,
-  READ,
-  READCHECK
+	WRITE, WRITECHECK, READ, READCHECK
 };
 
 enum SHARING_POLICY {
-  SHARED_FILE,
-  FILE_PER_PROCESS
+	SHARED_FILE, FILE_PER_PROCESS
 };
 
 /*****************************************************************************
@@ -92,7 +88,7 @@ enum SHARING_POLICY {
       MPI_Abort(MPI_COMM_WORLD, -1);					\
     }									\
   } while(0)
-  
+
 /*
  * Displays a fatal error message and exit the program.
  *

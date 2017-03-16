@@ -13,30 +13,56 @@
  * P R O T O T Y P E S                                                       *
  *****************************************************************************/
 
-static void usage(char **);
-static void display_splash();
-static void display_header(int, char **, enum VERBOSE);
-static void display_test_info(IORE_param_t *);
-static void display_setup(IORE_param_t *);
-static void display_summary(IORE_test_t *);
-static void display_footer();
+static void
+usage (char **);
+static void
+display_splash ();
+static void
+display_header (int, char **, enum VERBOSE);
+static void
+display_test_info (IORE_param_t *);
+static void
+display_setup (IORE_param_t *);
+static void
+display_summary (IORE_test_t *);
+static void
+display_footer ();
 
-static IORE_test_t *setup_tests(int, char **);
-static void setup_mpi_comm(IORE_param_t *);
+static IORE_test_t *
+setup_tests (int, char **);
+static void
+setup_mpi_comm (IORE_param_t *);
 
-static double get_timestamp();
-static void check_global_clock();
-static int has_passed_deadline(int, double);
-static void delay_secs(int, enum VERBOSE);
+static double
+get_timestamp ();
+static void
+check_global_clock ();
+static int
+has_passed_deadline (int, double);
+static void
+delay_secs (int, enum VERBOSE);
 
-static IORE_aio_t *get_aio_backend(char *);
-static void *get_test_file_name(char *, IORE_param_t *);
+static IORE_aio_t *
+get_aio_backend (char *);
+static void *
+get_test_file_name (char *, IORE_param_t *);
 
-static IORE_size_t perform_io(IORE_param_t *, void *, enum ACCESS);
-static void remove_file(char *, IORE_aio_t *, IORE_param_t *);
+static IORE_size_t
+perform_io (IORE_param_t *, void *, enum ACCESS);
+static void
+remove_file (char *, IORE_aio_t *, IORE_param_t *);
 
-static void run(IORE_test_t *);
-static void finalize(IORE_test_t *);
+static void
+run (IORE_test_t *);
+static void
+run_write (IORE_param_t *, IORE_aio_t *, IORE_results_t *, double **, int);
+static void
+run_read (IORE_param_t *, IORE_aio_t *, IORE_results_t *, double **, int);
+static void
+finalize (IORE_test_t *);
+static void
+finalize_iteration (IORE_param_t *, IORE_aio_t *, IORE_results_t *, double **,
+		    int);
 
 /*****************************************************************************
  * V A R I A B L E S                                                         *
@@ -49,63 +75,70 @@ static double clock_deviation;
 static double clock_delta = 0;
 
 /* TODO: use #ifdef to check compiled interfaces */
-static IORE_aio_t *available_ioreaio[] = { &ioreaio_posix,
-NULL };
+static IORE_aio_t *available_ioreaio[] =
+  { &ioreaio_posix, NULL };
 
 /*****************************************************************************
  * M A I N                                                                   *
  *****************************************************************************/
 
-int main(int argc, char **argv) {
-	IORE_test_t *tests;
+int
+main (int argc, char **argv)
+{
+  IORE_test_t *tests;
 
-	/* check for the -h or --help options (display usage) in the command
-	 line before starting MPI. */
-	int i;
-	for (i = 1; i < argc; i++) {
-		if (STREQUAL(argv[i], "-h") || STREQUAL(argv[i], "--help")) {
-			usage(argv);
-			exit(EXIT_SUCCESS);
-		}
+  /* check for the -h or --help options (display usage) in the command
+   line before starting MPI. */
+  int i;
+  for (i = 1; i < argc; i++)
+    {
+      if (STREQUAL(argv[i], "-h") || STREQUAL(argv[i], "--help"))
+	{
+	  usage (argv);
+	  exit (EXIT_SUCCESS);
+	}
+    }
+
+  display_splash ();
+
+  /* check for compiled I/O backend */
+  if (available_ioreaio[0] == NULL)
+    {
+      FATAL("No I/O backends compiled for IORE.");
+    }
+
+  IORE_MPI_CHECK(MPI_Init (&argc, &argv), "Cannot initialize MPI");
+  IORE_MPI_CHECK(MPI_Comm_size(MPI_COMM_WORLD, &nprocs),
+		 "Cannot get the number of MPI ranks");
+  IORE_MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank),
+		 "Cannot get the MPI rank");
+
+  /* setup tests based on command line arguments */
+  tests = setup_tests (argc, argv);
+
+  display_header (argc, argv, tests->params.verbose);
+
+  /* perform each test */
+  IORE_test_t *test;
+  for (test = tests; test != NULL; test = test->next)
+    {
+      if (rank == MASTER_RANK)
+	{
+	  display_test_info (&test->params);
 	}
 
-	display_splash();
+      run (test);
+    }
 
-	/* check for compiled I/O backend */
-	if (available_ioreaio[0] == NULL) {
-		FATAL("No I/O backends compiled for IORE.");
-	}
+  display_summary (tests);
 
-	IORE_MPI_CHECK(MPI_Init(&argc, &argv), "Cannot initialize MPI");
-	IORE_MPI_CHECK(MPI_Comm_size(MPI_COMM_WORLD, &nprocs),
-			"Cannot get the number of MPI ranks");
-	IORE_MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank),
-			"Cannot get the MPI rank");
+  display_footer ();
 
-	/* setup tests based on command line arguments */
-	tests = setup_tests(argc, argv);
+  finalize (tests);
 
-	display_header(argc, argv, tests->params.verbose);
+  IORE_MPI_CHECK(MPI_Finalize (), "Cannot finalize MPI");
 
-	/* perform each test */
-	IORE_test_t *test;
-	for (test = tests; test != NULL; test = test->next) {
-		if (rank == MASTER_RANK) {
-			display_test_info(&test->params);
-		}
-
-		run(test);
-	}
-
-	display_summary(tests);
-
-	display_footer();
-
-	finalize(tests);
-
-	IORE_MPI_CHECK(MPI_Finalize(), "Cannot finalize MPI");
-
-	return (error_count);
+  return (error_count);
 }
 
 /*****************************************************************************
@@ -117,26 +150,32 @@ int main(int argc, char **argv) {
  * 
  * **argv: command line arguments
  */
-static void usage(char **argv) {
-	char *opts[] = { "OPTIONS:", " -h    display command line options and help",
-			" ", "* NOTE: S is a string, N is an integer number.", " ", "" };
+static void
+usage (char **argv)
+{
+  char *opts[] =
+    { "OPTIONS:", " -h    display command line options and help", " ",
+	"* NOTE: S is a string, N is an integer number.", " ", "" };
 
-	fprintf(stdout, "Usage: %s [OPTIONS]\n\n", *argv);
-	int i;
-	for (i = 0; strlen(opts[i]) > 0; i++) {
-		fprintf(stdout, "%s\n", opts[i]);
-	}
+  fprintf (stdout, "Usage: %s [OPTIONS]\n\n", *argv);
+  int i;
+  for (i = 0; strlen (opts[i]) > 0; i++)
+    {
+      fprintf (stdout, "%s\n", opts[i]);
+    }
 
-	return;
+  return;
 }
 
 /*
  * Displays the splash screen.
  */
-static void display_splash() {
-	/* TODO: include META_VERSION definition */
-	fprintf(stdout, "IORE %s - The IOR-Extended Benchmark\n\n", "TBA");
-	fflush(stdout);
+static void
+display_splash ()
+{
+  /* TODO: include META_VERSION definition */
+  fprintf (stdout, "IORE %s - The IOR-Extended Benchmark\n\n", "TBA");
+  fflush (stdout);
 }
 
 /*
@@ -146,8 +185,10 @@ static void display_splash() {
  * argv: array of arguments
  * verbose: verbosity level
  */
-static void display_header(int argc, char **argv, enum VERBOSE verbose) {
-	/* TODO: implement */
+static void
+display_header (int argc, char **argv, enum VERBOSE verbose)
+{
+  /* TODO: implement */
 }
 
 /*
@@ -155,8 +196,10 @@ static void display_header(int argc, char **argv, enum VERBOSE verbose) {
  *
  * params: test parameters
  */
-static void display_test_info(IORE_param_t *params) {
-	/* TODO: implement */
+static void
+display_test_info (IORE_param_t *params)
+{
+  /* TODO: implement */
 }
 
 /*
@@ -164,8 +207,10 @@ static void display_test_info(IORE_param_t *params) {
  *
  * params: test parameters.
  */
-static void display_setup(IORE_param_t *params) {
-	/* TODO: implement */
+static void
+display_setup (IORE_param_t *params)
+{
+  /* TODO: implement */
 }
 
 /*
@@ -173,15 +218,19 @@ static void display_setup(IORE_param_t *params) {
  *
  * tests: tests list
  */
-static void display_summary(IORE_test_t *tests) {
-	/* TODO: implement */
+static void
+display_summary (IORE_test_t *tests)
+{
+  /* TODO: implement */
 }
 
 /*
  * Displays concluding information.
  */
-static void display_footer() {
-	/* TODO: implement */
+static void
+display_footer ()
+{
+  /* TODO: implement */
 }
 
 /*
@@ -190,17 +239,19 @@ static void display_footer() {
  * argc: number of arguments
  * argv: array of arguments
  */
-static IORE_test_t *setup_tests(int argc, char **argv) {
-	/* TODO: consider possibility of specifying multiple tests */
-	IORE_test_t *tests;
+static IORE_test_t *
+setup_tests (int argc, char **argv)
+{
+  /* TODO: consider possibility of specifying multiple tests */
+  IORE_test_t *tests;
 
-	tests = parse_cmd_line(argc, argv);
+  tests = parse_cmd_line (argc, argv);
 
-	check_global_clock();
+  check_global_clock ();
 
-	/* TODO: implement */
+  /* TODO: implement */
 
-	return (tests);
+  return (tests);
 }
 
 /*
@@ -208,88 +259,98 @@ static IORE_test_t *setup_tests(int argc, char **argv) {
  *
  * params: test parameters.
  */
-static void setup_mpi_comm(IORE_param_t *params) {
-	int range[3];
-	MPI_Group orig_group;
-	MPI_Group new_group;
-	MPI_Comm comm;
+static void
+setup_mpi_comm (IORE_param_t *params)
+{
+  int range[3];
+  MPI_Group orig_group;
+  MPI_Group new_group;
+  MPI_Comm comm;
 
-	if (params->num_tasks > nprocs) {
-		if (rank == MASTER_RANK) {
-			WARNF(
-					"More tasks requested (%d) than available (%d); using %d tasks.\n",
-					params->num_tasks, nprocs, nprocs);
-		}
-		params->num_tasks = nprocs;
+  if (params->num_tasks > nprocs)
+    {
+      if (rank == MASTER_RANK)
+	{
+	  WARNF(
+	      "More tasks requested (%d) than available (%d); using %d tasks.\n",
+	      params->num_tasks, nprocs, nprocs);
 	}
+      params->num_tasks = nprocs;
+    }
 
-	range[0] = 0; /* first rank */
-	range[1] = params->num_tasks - 1; /* last rank */
-	range[2] = 1; /* stride */
+  range[0] = 0; /* first rank */
+  range[1] = params->num_tasks - 1; /* last rank */
+  range[2] = 1; /* stride */
 
-	IORE_MPI_CHECK(MPI_Comm_group(MPI_COMM_WORLD, &orig_group),
-			"Failed to get original MPI group.");
-	IORE_MPI_CHECK(MPI_Group_range_incl(orig_group, 1, &range, &new_group),
-			"Failed to create new MPI group.");
-	IORE_MPI_CHECK(MPI_Comm_create(MPI_COMM_WORLD, new_group, &comm),
-			"Failed to create new MPI communicator.");
-	params->comm = comm;
+  IORE_MPI_CHECK(MPI_Comm_group(MPI_COMM_WORLD, &orig_group),
+		 "Failed to get original MPI group.");
+  IORE_MPI_CHECK(MPI_Group_range_incl (orig_group, 1, &range, &new_group),
+		 "Failed to create new MPI group.");
+  IORE_MPI_CHECK(MPI_Comm_create(MPI_COMM_WORLD, new_group, &comm),
+		 "Failed to create new MPI communicator.");
+  params->comm = comm;
 
-	/* block tasks not participating in this test */
-	if (comm == MPI_COMM_NULL) {
-		IORE_MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD),
-				"Failed to block unnused tasks");
-	}
+  /* sychronize tasks not participating in this test */
+  if (comm == MPI_COMM_NULL)
+    {
+      IORE_MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD),
+		     "Failed to block unnused tasks");
+    }
 }
 
 /*
  * Get current timestamp.
  */
-static double get_timestamp() {
-	double t;
+static double
+get_timestamp ()
+{
+  double t;
 
-	t = MPI_Wtime();
-	if (t < 0) {
-		FATAL("Failed to get timestamp using MPI_Wtime().");
-	}
-	t -= clock_delta;
+  t = MPI_Wtime ();
+  if (t < 0)
+    {
+      FATAL("Failed to get timestamp using MPI_Wtime().");
+    }
+  t -= clock_delta;
 
-	return t;
+  return t;
 }
 
 /*
  * Get differences in times between nodes.
  */
-static void check_global_clock() {
-	double ts;
-	double master_ts;
-	double min = 0;
-	double max = 0;
+static void
+check_global_clock ()
+{
+  double ts;
+  double master_ts;
+  double min = 0;
+  double max = 0;
 
-	/* block all tasks */
-	IORE_MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD), "Failed to barrier");
+  /* block all tasks */
+  IORE_MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD), "Failed to barrier");
 
-	ts = get_timestamp();
+  ts = get_timestamp ();
 
-	/* reduce to get min and max timestamps */
-	IORE_MPI_CHECK(
-			MPI_Reduce(&ts, &min, 1, MPI_DOUBLE, MPI_MIN, MASTER_RANK, MPI_COMM_WORLD),
-			"Failed to reduce tasks' timestamps");
-	IORE_MPI_CHECK(
-			MPI_Reduce(&ts, &max, 1, MPI_DOUBLE, MPI_MAX, MASTER_RANK, MPI_COMM_WORLD),
-			"Failed to reduce tasks' timestamps");
+  /* reduce to get min and max timestamps */
+  IORE_MPI_CHECK(
+      MPI_Reduce(&ts, &min, 1, MPI_DOUBLE, MPI_MIN, MASTER_RANK, MPI_COMM_WORLD),
+      "Failed to reduce tasks' timestamps");
+  IORE_MPI_CHECK(
+      MPI_Reduce(&ts, &max, 1, MPI_DOUBLE, MPI_MAX, MASTER_RANK, MPI_COMM_WORLD),
+      "Failed to reduce tasks' timestamps");
 
-	/* compute clock delta in nodes considering the master rank */
-	master_ts = ts;
-	IORE_MPI_CHECK(
-			MPI_Bcast(&master_ts, 1, MPI_DOUBLE, MASTER_RANK, MPI_COMM_WORLD),
-			"Failed to broadcast master timestamp");
-	clock_delta = ts - master_ts;
+  /* compute clock delta in nodes considering the master rank */
+  master_ts = ts;
+  IORE_MPI_CHECK(
+      MPI_Bcast(&master_ts, 1, MPI_DOUBLE, MASTER_RANK, MPI_COMM_WORLD),
+      "Failed to broadcast master timestamp");
+  clock_delta = ts - master_ts;
 
-	/* compute total clock deviation across all nodes */
-	clock_deviation = max - min;
+  /* compute total clock deviation across all nodes */
+  clock_deviation = max - min;
 
-	return;
+  return;
 }
 
 /*
@@ -298,16 +359,19 @@ static void check_global_clock() {
  * max_time: max time in seconds for a test.
  * start_time: test start time.
  */
-static int has_passed_deadline(int max_time, double start_time) {
-	double deadline;
-	int has_passed = FALSE;
+static int
+has_passed_deadline (int max_time, double start_time)
+{
+  double deadline;
+  int has_passed = FALSE;
 
-	if (max_time > 0) {
-		deadline = start_time + max_time;
-		has_passed = get_timestamp() >= deadline;
-	}
+  if (max_time > 0)
+    {
+      deadline = start_time + max_time;
+      has_passed = get_timestamp () >= deadline;
+    }
 
-	return has_passed;
+  return has_passed;
 }
 
 /*
@@ -316,13 +380,17 @@ static int has_passed_deadline(int max_time, double start_time) {
  * t: number of seconds.
  * verbose: verbosity level.
  */
-static void delay_secs(int t, enum VERBOSE verbose) {
-	if (rank == 0 && t > 0) {
-		if (verbose >= VERBOSE_1) {
-			INFOF("Delaying for %d seconds...\n", t);
-			sleep(t);
-		}
+static void
+delay_secs (int t, enum VERBOSE verbose)
+{
+  if (rank == 0 && t > 0)
+    {
+      if (verbose >= VERBOSE_1)
+	{
+	  INFOF("Delaying for %d seconds...\n", t);
+	  sleep (t);
 	}
+    }
 }
 
 /*
@@ -330,35 +398,43 @@ static void delay_secs(int t, enum VERBOSE verbose) {
  *
  * api: name of the API
  */
-static IORE_aio_t *get_aio_backend(char *api) {
-	IORE_aio_t *backend = NULL;
-	IORE_aio_t **ioreaio = available_ioreaio;
+static IORE_aio_t *
+get_aio_backend (char *api)
+{
+  IORE_aio_t *backend = NULL;
+  IORE_aio_t **ioreaio = available_ioreaio;
 
-	while (*ioreaio != NULL && backend == NULL) {
-		if (STREQUAL(api, (*ioreaio)->name)) {
-			backend = *ioreaio;
-		}
-		ioreaio++;
+  while (*ioreaio != NULL && backend == NULL)
+    {
+      if (STREQUAL(api, (*ioreaio)->name))
+	{
+	  backend = *ioreaio;
 	}
+      ioreaio++;
+    }
 
-	if (backend == NULL) {
-		FATAL("Unrecognized I/O API.");
-	}
+  if (backend == NULL)
+    {
+      FATAL("Unrecognized I/O API.");
+    }
 }
 
 /*
  * TODO: document
  */
-static void *get_test_file_name(char *file_name, IORE_param_t *params) {
-	/* TODO: implement */
+static void *
+get_test_file_name (char *file_name, IORE_param_t *params)
+{
+  /* TODO: implement */
 }
 
 /*
  * TODO: document
  */
-static IORE_size_t perform_io(IORE_param_t *params, void *fd,
-		enum ACCESS access) {
-	/* TODO: implement */
+static IORE_size_t
+perform_io (IORE_param_t *params, void *fd, enum ACCESS access)
+{
+  /* TODO: implement */
 }
 
 /*
@@ -368,142 +444,233 @@ static IORE_size_t perform_io(IORE_param_t *params, void *fd,
  * backend: I/O backend.
  * params: test parameters.
  */
-static void remove_file(char *file_name, IORE_aio_t *backend,
-		IORE_param_t *params) {
-	if (params->sharing_policy == SHARED_FILE) {
-		if (rank == MASTER_RANK && access(file_name, F_OK) == 0) {
-			backend->delete(file_name, MASTER_RANK, params);
-		}
-	} else { /* FILE_PER_PROCESS */
-		/* TODO: implement */
+static void
+remove_file (char *file_name, IORE_aio_t *backend, IORE_param_t *params)
+{
+  if (params->sharing_policy == SHARED_FILE)
+    {
+      if (rank == MASTER_RANK && access (file_name, F_OK) == 0)
+	{
+	  backend->delete (file_name, MASTER_RANK, params);
 	}
+    }
+  else
+    { /* FILE_PER_PROCESS */
+      /* TODO: implement */
+    }
 }
 
 /*
  * Execute iterations of a single test.
  */
-static void run(IORE_test_t *test) {
-	IORE_aio_t *backend;
-	IORE_param_t *params = &test->params;
-	enum VERBOSE verbose = params->verbose;
-	double *timer[12];
-	double start_time;
-	int max_time = params->max_time_per_test;
-	char *file_name;
-	void *fd;
-	IORE_size_t data_moved;
+static void
+run (IORE_test_t *test)
+{
+  IORE_aio_t *backend;
+  IORE_param_t *params = &test->params;
+  enum VERBOSE verbose = params->verbose;
+  double *timer[NUM_TIMERS];
+  double start_time;
+  int max_time = params->max_time_per_test;
 
-	setup_mpi_comm(params);
-	if (rank == MASTER_RANK && verbose >= VERBOSE_1) {
-		INFOF("Participating tasks: %d\n", params->num_tasks);
+  setup_mpi_comm (params);
+  if (rank == MASTER_RANK && verbose >= VERBOSE_1)
+    {
+      INFOF("Participating tasks: %d\n", params->num_tasks);
+    }
+
+  /* TODO: check count_tasks_per_node need */
+
+  /* setup timers */
+  int i;
+  for (i = 0; i < NUM_TIMERS; i++)
+    {
+      timer[i] = (double *) malloc (params->repetitions * sizeof(double));
+      if (timer[i] == NULL)
+	{
+	  FATAL("Failed to allocated memory for timers.");
 	}
+    }
 
-	/* TODO: check count_tasks_per_node need */
+  backend = get_aio_backend (params->api);
 
-	/* setup timers */
-	int i;
-	for (i = 0; i < 12; i++) {
-		timer[i] = (double *) malloc(params->repetitions * sizeof(double));
-		if (timer[i] == NULL) {
-			FATAL("Failed to allocated memory for timers.");
-		}
-	}
+  if (rank == MASTER_RANK && verbose >= VERBOSE_0)
+    {
+      display_setup (params);
+    }
 
-	backend = get_aio_backend(params->api);
+  /* TODO: check hogMemory need */
 
-	if (rank == MASTER_RANK && verbose >= VERBOSE_0) {
-		display_setup(params);
-	}
+  start_time = get_timestamp ();
 
-	/* TODO: check hogMemory need */
+  /* loop over test repetitions */
+  int r;
+  for (r = 0; r < params->repetitions; r++)
+    {
+      /* TODO: check pre-operation statements */
 
-	start_time = get_timestamp();
+      /* write test */
+      if (params->write && !has_passed_deadline (max_time, start_time))
+	{
+	  run_write (params, backend, test->results, timer, r);
+	} /* end of write test */
 
-	/* loop over test repetitions */
-	int r;
-	for (r = 0; r < params->repetitions; r++) {
-		/* TODO: check pre-operation statements */
+      /* check write test */
+      if (params->write_check && !has_passed_deadline (max_time, start_time))
+	{
+	  /* TODO: implement */
+	} /* end of check write test */
 
-		/* write test */
-		if (params->write && !has_passed_deadline(max_time, start_time)) {
-			/* define file name */
-			get_test_file_name(file_name, params);
-			if (verbose >= VERBOSE_3) {
-				INFOF("Task %d writing %s\n", rank, file_name);
-			}
+      /* read test */
+      if (params->read && !has_passed_deadline (max_time, start_time))
+	{
+	  run_read (params, backend, test->results, timer, r);
+	} /* end of read test */
 
-			/* delay between tests */
-			delay_secs(params->intra_test_delay, verbose);
+      /* check read test */
+      if (params->read_check && !has_passed_deadline (max_time, start_time))
+	{
+	  /* TODO: implement */
+	} /* end of check read test */
 
-			/* define initial file condition */
-			if (!params->use_existing_test_file) {
-				remove_file(file_name, backend, params);
-			}
+      /* synchronize tasks */
+      IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
 
-			/* synchornize tasks */
-			IORE_MPI_CHECK(MPI_Barrier(params->comm),
-					"Failed to synchronize tasks");
+      /* finalize test iteration */
+      finalize_iteration (params, backend, test->results, timer, r);
+    } /* end of loop over test iterations */
 
-			/* TODO: check need for open and openFlags attributes related to HDF5 */
+  /* TODO: display summary of results of the test */
 
-			/* create/open file */
-			timer[W_OPEN_START][r] = get_timestamp();
-			fd = backend->create(file_name, params);
-			timer[W_OPEN_STOP][r] = get_timestamp();
+  /* clean-up */
+  for (i = 0; i < NUM_TIMERS; i++)
+    {
+      free (timer[i]);
+    }
 
-			if (params->intra_test_sync) {
-				IORE_MPI_CHECK(MPI_Barrier(params->comm),
-						"Failed to synchronize tasks");
-			}
+  IORE_MPI_CHECK(MPI_Comm_free (&params->comm),
+		 "Failed to free the MPI communicator.");
 
-			if (rank == MASTER_RANK && verbose >= VERBOSE_1) {
-				INFOF("Starting write performance test: %s", get_time_string());
-			}
+  /* synchronize with tasks not participating in this test */
+  IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
+}
 
-			/* write file */
-			timer[W_START][r] = get_timestamp();
-			data_moved = perform_io(params, fd, WRITE);
-			timer[W_STOP][r] = get_timestamp();
+/*
+ * Execute a single iteration of a write test.
+ *
+ * params: test parameters.
+ * backend: I/O backend.
+ * results: structure with performance test measures.
+ * timer: performance timers.
+ * r: repetition number.
+ */
+static void
+run_write (IORE_param_t *params, IORE_aio_t *backend, IORE_results_t *results,
+	   double **timer, int r)
+{
+  enum VERBOSE verbose = params->verbose;
+  char *file_name;
+  void *fd;
+  IORE_size_t data_moved;
 
-			if (params->intra_test_sync) {
-				IORE_MPI_CHECK(MPI_Barrier(params->comm),
-						"Failed to synchronize tasks");
-			}
+  /* define file name */
+  get_test_file_name (file_name, params);
+  if (verbose >= VERBOSE_3)
+    {
+      INFOF("Task %d writing %s\n", rank, file_name);
+    }
 
-			/* close file */
-			timer[W_CLOSE_START][r] = get_timestamp();
-			backend->close(fd, params);
-			timer[W_CLOSE_STOP][r] = get_timestamp();
+  /* delay between tests */
+  delay_secs (params->intra_test_delay, verbose);
 
-			/* synchornize tasks */
-			IORE_MPI_CHECK(MPI_Barrier(params->comm),
-					"Failed to synchronize tasks");
+  /* define initial file condition */
+  if (!params->use_existing_test_file)
+    {
+      remove_file (file_name, backend, params);
+    }
 
-			/* TODO: continue... */
-		} /* end of write test */
+  /* synchornize tasks */
+  IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
 
-		/* check write test */
-		if (params->write_check && !has_passed_deadline(max_time, start_time)) {
+  /* TODO: check need for open and openFlags attrs related to HDF5 */
 
-		} /* end of check write test */
+  /* create/open file */
+  timer[W_OPEN_START][r] = get_timestamp ();
+  fd = backend->create (file_name, params);
+  timer[W_OPEN_STOP][r] = get_timestamp ();
 
-		/* read test */
-		if (params->read && !has_passed_deadline(max_time, start_time)) {
+  if (params->intra_test_sync)
+    {
+      IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
+    }
 
-		} /* end of read test */
+  if (rank == MASTER_RANK && verbose >= VERBOSE_1)
+    {
+      INFOF("Starting write performance test: %s", get_time_string ());
+    }
 
-		/* check read test */
-		if (params->read_check && !has_passed_deadline(max_time, start_time)) {
+  /* write file */
+  timer[W_START][r] = get_timestamp ();
+  data_moved = perform_io (params, fd, WRITE);
+  timer[W_STOP][r] = get_timestamp ();
 
-		} /* end of check read test */
-	} /* end of loop over test iterations */
+  if (params->intra_test_sync)
+    {
+      IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
+    }
 
-	/* TODO: implement */
+  /* close file */
+  timer[W_CLOSE_START][r] = get_timestamp ();
+  backend->close (fd, params);
+  timer[W_CLOSE_STOP][r] = get_timestamp ();
+
+  /* synchornize tasks */
+  IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
+
+  /* TODO: check need for collecting the aggregate file size */
+
+  display_test_results ();
+  /* TODO: implement */
+}
+
+/*
+ * TODO: document
+ */
+static void
+run_read (IORE_param_t *params, IORE_aio_t *backend, IORE_results_t *results,
+	  double **timer, int repetition)
+{
+  /* TODO: implement */
 }
 
 /*
  * Execute finalizing actions (e.g., destroy tests, etc.).
  */
-static void finalize(IORE_test_t *test) {
-	/* TODO: implement */
+static void
+finalize (IORE_test_t *test)
+{
+  /* TODO: implement */
+}
+
+/*
+ * TODO: document
+ */
+static void
+finalize_iteration (IORE_param_t *params, IORE_aio_t *backend,
+		    IORE_results_t *results, double **timer, int r)
+{
+  if (!params->keep_file
+      && !(params->error_found && params->keep_file_with_error))
+    {
+      timer[D_START][r] = get_timestamp ();
+      remove_file (file_name, backend, params);
+      timer[D_STOP][r] = get_timestamp ();
+
+      /* synchronize tasks */
+      IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
+
+      display_test_results ();
+    }
+
+  params->error_found = FALSE;
 }
