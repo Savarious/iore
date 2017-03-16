@@ -434,7 +434,11 @@ get_test_file_name (char *file_name, IORE_param_t *params)
 static IORE_size_t
 perform_io (IORE_param_t *params, void *fd, enum ACCESS access)
 {
-  /* TODO: implement */
+  /* TODO: consider randomOffset for read tests */
+
+
+
+  /* TODO: continue... */
 }
 
 /*
