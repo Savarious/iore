@@ -29,33 +29,30 @@
 
 #define MAX_STR 1024 /* max string length */
 #define MAX_RETRY 10000 /* max number of retries for POSIX I/O */
+#define NUM_TIMERS 14 /* number of test timers */
+
+/* Timer array indices; W for write, R for read, and D for delete */
+#define W_OPEN_START 0
+#define W_OPEN_STOP 1
+#define W_START 2
+#define W_STOP 3
+#define W_CLOSE_START 4
+#define W_CLOSE_STOP 5
+#define R_OPEN_START 6
+#define R_OPEN_STOP 7
+#define R_START 8
+#define R_STOP 9
+#define R_CLOSE_START 10
+#define R_CLOSE_STOP 11
+#define D_START 12
+#define D_STOP 13
 
 /*****************************************************************************
  * P R O T O T Y P E S                                                       *
  *****************************************************************************/
 
-char *get_time_string();
-
-/*****************************************************************************
- * D E C L A R A T I O N S                                                   *
- *****************************************************************************/
-
-enum VERBOSE {
-	VERBOSE_0 = 0,
-	VERBOSE_1 = 1,
-	VERBOSE_2 = 2,
-	VERBOSE_3 = 3,
-	VERBOSE_4 = 4,
-	VERBOSE_5 = 5
-};
-
-enum ACCESS {
-	WRITE, WRITECHECK, READ, READCHECK
-};
-
-enum SHARING_POLICY {
-	SHARED_FILE, FILE_PER_PROCESS
-};
+char *
+get_time_string ();
 
 /*****************************************************************************
  * M A C R O S                                                               *
@@ -76,7 +73,7 @@ enum SHARING_POLICY {
  * ERROR_CODE: error code from MPI
  * IORE_MSG: custom error message
  */
-#define IORE_MPI_CHECK(ERROR_CODE, IORE_MSG) do {			\
+#define IORE_MPI_CHECK(ERROR_CODE, IORE_MSG) do {   			\
     if (ERROR_CODE != MPI_SUCCESS) {					\
       char error_string[MPI_MAX_ERROR_STRING];				\
       int error_string_length;						\
@@ -105,10 +102,9 @@ enum SHARING_POLICY {
  * Displays an error message.
  *
  * IORE_MSG: custom message
- * VERBOSE: verbosity level
  */
-#define ERR(IORE_MSG, VERBOSE) do {					\
-    if (VERBOSE <= VERBOSE_2) {						\
+#define ERR(IORE_MSG) do {						\
+    if (verbose <= VERBOSE_2) {						\
       fprintf(stderr, "IORE ERROR: %s, errno %d, %s.\n", IORE_MSG,	\
 	      errno, strerror(errno));					\
     } else {								\
@@ -121,10 +117,9 @@ enum SHARING_POLICY {
  * Displays a warning message.
  * 
  * IORE_MSG: custom message
- * VERBOSE: verbosity level
  */
-#define WARN(IORE_MSG, VERBOSE) do {					\
-    if (VERBOSE <= VERBOSE_2) {						\
+#define WARN(IORE_MSG) do {						\
+    if (verbose <= VERBOSE_2) {						\
       fprintf(stdout, "IORE WARNING: %s.\n", IORE_MSG);			\
     } else {								\
       fprintf(stdout, "IORE WARNING: %s, (%s:%d).\n", IORE_MSG,		\
@@ -137,22 +132,27 @@ enum SHARING_POLICY {
  * Displays a formatted warning message.
  * 
  * IORE_MSG_FORMAT: string format for printf
- * VERBOSE: verbosity level
  */
-#define WARNF(IORE_MSG_FMT, VERBOSE, ...) do {	\
-    char msg[MAX_STR];				\
-    sprintf(msg, IORE_MSG_FMT, __VA_ARGS__);	\
-    WARN(msg, VERBOSE);				\
+#define WARNF(IORE_MSG_FMT, ...) do {					\
+    char msg[MAX_STR];							\
+    sprintf(msg, IORE_MSG_FMT, __VA_ARGS__);				\
+    if (verbose <= CONTROL) {						\
+      fprintf(stdout, "IORE WARNING: %s.\n", msg);			\
+    } else {								\
+      fprintf(stdout, "IORE WARNING: %s, (%s:%d).\n", msg,		\
+    	      __FILE__, __LINE__);					\
+      }								  	\
+    fflush(stdout);							\
   } while(0)
 
 /*
- * Displays a general message.
+ * Displays a formatted information message.
  * 
  * IORE_MSG_FMT: string format for printf
  */
-#define INFOF(IORE_MSG_FMT, ...) do {		\
-    fprintf(stdout, IORE_MSG_FMT, __VA_ARGS__); \
-    fflush(stdout);				\
+#define INFOF(IORE_MSG_FMT, ...) do {					\
+    fprintf(stdout, IORE_MSG_FMT, __VA_ARGS__); 			\
+    fflush(stdout);							\
   } while(0)
 
 #endif /* _UTIL_H */
