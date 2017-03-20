@@ -382,7 +382,7 @@ has_passed_deadline (int max_time, double start_time)
 static void
 delay_secs (int t, enum VERBOSE verbose)
 {
-  if (rank == 0 && t > 0)
+  if (rank == MASTER_RANK && t > 0)
     {
       if (verbose >= VERBOSE_1)
 	{
@@ -555,7 +555,7 @@ run (IORE_test_t *test)
 		 "Failed to free the MPI communicator.");
 
   /* synchronize with tasks not participating in this test */
-  IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
+  IORE_MPI_CHECK(MPI_Barrier (MPI_COMM_WORLD), "Failed to synchronize tasks");
 }
 
 /*

@@ -33,35 +33,39 @@ typedef long long int IORE_offset_t;
 typedef long long int IORE_size_t;
 typedef double IORE_time_t;
 
-typedef struct IORE_workload
+typedef struct IORE_params
 {
+  int ref_num; /* custom ID number */
+
   int num_tasks; /* number of parallel tasks */
   char api[MAX_STR]; /* API used for I/O */
   enum SHARING_POLICY sharing_policy; /* policy for file sharing */
   enum ACCESS_PATTERN access_pattern; /* access order of file offsets */
-  IORE_size_t *block_size; /* set of sizes of blocks */
-  IORE_size_t *transfer_size; /* set of sizes of I/O requests */
+  IORE_size_t *block_sizes; /* set of sizes of blocks */
+  IORE_size_t *transfer_sizes; /* set of sizes of I/O requests */
   int write_test; /* perform write test */
   int read_test; /* perform read test */
-  char *orig_file_name; /* full name of the test file defined by the user*/
-} IORE_workload_t;
+  char file_name[MAXPATHLEN]; /* full name of the provided test file */
 
-typedef struct IORE_params
-{
-  int ref_num; /* custom ID number */
-  IORE_workload_t *workloads; /* set of workloads */
   int num_repetitions; /* number of repetitions of a run */
   int inter_test_delay; /* delay in seconds before read/write tests */
   int intra_test_barrier; /* synchronize tasks before and after I/O tests */
-  int test_time_limit; /* time soft limit in minutes to complete each test */
+  int run_time_limit; /* time soft limit in minutes to complete each run */
   int keep_file; /* keep the file after test completion */
-  int keep_file_on_error; /* keep the file after a test with error */
   int use_existing_file; /* prevent removing the file before the test */
+  int rep_in_file_name; /* use repetition number to form the file name */
+  int dir_per_file; /* use an individual directory for each file */
+  int reorder_tasks; /* tasks read offsets from other tasks */
+  int reorder_tasks_offset; /* distance in number of nodes for reordering */
   enum VERBOSITY verbose; /* verbosity level */
 
   MPI_Comm comm; /* MPI communicator for the run */
-  int task_count; /* total number of tasks specified for a run */
-  int adjusted_task_count; /* adjusted number of tasks for a run */
+  int rank; /* MPI rank */
+  int eff_num_tasks; /* effective number of tasks for a run */
+  int tasks_per_node; /* number of tasks per compute node */
+  int repetition; /* repetition number inside a run */
+  IORE_size_t transfer_size; /* transfer size used by a task */
+  IORE_offset_t offset; /* current offset being read/written */
 } IORE_params_t;
 
 typedef struct IORE_results
@@ -85,12 +89,13 @@ typedef struct IORE_aio
   char *name; /* API name */
 
   void *
-  (*create) (char *, IORE_params_t *);
+  (*create) (IORE_params_t *);
   void *
-  (*open) (char *, IORE_params_t *);
+  (*open) (IORE_params_t *);
   void
-  (*close) (void *, IORE_params_t *);void
-  (*delete) (char *, IORE_params_t *);
+  (*close) (void *, IORE_params_t *);
+  void
+  (*delete) (IORE_params_t *);
   IORE_size_t
   (*io) (void *, IORE_size_t *, IORE_size_t, enum ACCESS_TYPE, IORE_params_t *);
 } IORE_aio_t;

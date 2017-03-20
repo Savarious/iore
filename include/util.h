@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/param.h> /* MAXPATHLEN */
 
 /*****************************************************************************
  * D E F I N I T I O N S                                                     *
@@ -94,6 +95,20 @@ get_time_string ();
 #define FATAL(IORE_MSG) do {						\
     fprintf(stderr, "IORE FATAL: %s, errno %d, %s (%s:%d).\n",		\
 	    IORE_MSG, errno, strerror(errno), __FILE__, __LINE__);	\
+    fflush(stderr);							\
+    MPI_Abort(MPI_COMM_WORLD, -1);					\
+  } while(0)
+
+/*
+ * Displays a fatal error message and exit the program.
+ *
+ * IORE_MSG_FMT: custom message format
+ */
+#define FATALF(IORE_MSG_FMT, ...) do { 					\
+    char msg[MAX_STR];							\
+    sprintf(msg, IORE_MSG_FMT, __VA_ARGS__);				\
+    fprintf(stderr, "IORE FATAL: %s, errno %d, %s (%s:%d).\n",		\
+    	    msg, errno, strerror(errno), __FILE__, __LINE__);		\
     fflush(stderr);							\
     MPI_Abort(MPI_COMM_WORLD, -1);					\
   } while(0)
