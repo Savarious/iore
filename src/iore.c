@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include "ioretypes.h"
 #include "util.h"
@@ -39,13 +40,19 @@ cleanup_experiment (IORE_run_t *);
 static void
 setup_run (IORE_params_t *);
 static void
+cleanup_run (IORE_params_t *);
+static void
 setup_mpi_comm (IORE_params_t *);
 static void
 setup_timers (double **, int);
 static void
 setup_aio_backend (char *);
 static void
-cleanup_run (IORE_params_t *);
+setup_io (enum ACCESS_TYPE, IORE_params_t *, IORE_offset_t *, void *);
+static void
+cleanup_io (IORE_offset_t *, void *);
+static void
+setup_buffer (enum ACCESS_TYPE, int, IORE_params_t *, void **);
 
 static void
 exec_run (IORE_run_t *);
@@ -64,12 +71,17 @@ delay_secs (int);
 static void
 remove_file (IORE_params_t *);
 static IORE_size_t
-perform_io (void *, enum ACCESS_TYPE, IORE_params_t *);
+perform_io (void *, enum ACCESS_TYPE, IORE_offset_t *, IORE_size_t *,
+	    IORE_params_t *);
 
 static char *
 get_file_name (IORE_params_t *);
 static char *
 prepend_dir (char *, int);
+static IORE_offset_t *
+get_sequential_offsets (int, IORE_params_t *);
+static IORE_offset_t *
+get_random_offsets (int, IORE_params_t *);
 
 /*****************************************************************************
  * D E C L A R A T I O N S                                                   *
@@ -223,11 +235,11 @@ exec_run (IORE_run_t *run)
 static void
 exec_write_test (IORE_params_t *params, IORE_results_t *results, int r)
 {
+  IORE_size_t data_moved = 0;
   char *file_name;
   void *fd;
-  IORE_size_t data_moved = 0;
   IORE_offset_t *offsets;
-  void *buf = NULL;
+  void *buf;
 
   file_name = get_file_name (params);
   if (verbose >= TASK)
@@ -238,7 +250,7 @@ exec_write_test (IORE_params_t *params, IORE_results_t *results, int r)
   if (!params->use_existing_file)
     remove_file (params);
 
-  /* TODO: implement setup_io */
+  setup_io (WRITE, params, offsets, buf);
 
   /* synchronize participating tasks */
   IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks.");
@@ -267,6 +279,8 @@ exec_write_test (IORE_params_t *params, IORE_results_t *results, int r)
   backend->close (fd, params);
   timer[W_CLOSE_STOP][r] = get_timestamp ();
 
+  cleanup_io(offsets, buf);
+
   /* synchornize participating tasks */
   IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
 
@@ -282,6 +296,8 @@ exec_read_test (IORE_params_t *params, IORE_results_t *results, int r)
   char *file_name;
   void *fd;
   IORE_size_t data_moved;
+  IORE_offset_t *offsets;
+  void *buf;
 
   if (params->reorder_tasks)
     rank_offset = (params->reorder_tasks_offset * params->tasks_per_node)
@@ -293,7 +309,7 @@ exec_read_test (IORE_params_t *params, IORE_results_t *results, int r)
 
   delay_secs (params->inter_test_delay);
 
-  /* TODO: implement setup_io */
+  setup_io (READ, params, offsets, buf);
 
   /* synchronize participating tasks */
   IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks.");
@@ -322,6 +338,8 @@ exec_read_test (IORE_params_t *params, IORE_results_t *results, int r)
   backend->close (fd, params);
   timer[R_CLOSE_STOP][r] = get_timestamp ();
 
+  cleanup_io(offsets, buf);
+
   /* synchornize participating tasks */
   IORE_MPI_CHECK(MPI_Barrier (params->comm), "Failed to synchronize tasks");
 
@@ -334,11 +352,13 @@ exec_read_test (IORE_params_t *params, IORE_results_t *results, int r)
 static void
 setup_run (IORE_params_t *params)
 {
+  time_t curtime;
+
   verbose = params->verbose;
 
   setup_mpi_comm (params);
   /* only tasks participating in this run */
-  if (params->comm == MPI_COMM_NULL)
+  if (params->comm != MPI_COMM_NULL)
     {
       if (rank == MASTER_RANK && verbose >= CONTROL)
 	INFOF("Participating tasks: %d\n", params->eff_num_tasks);
@@ -346,8 +366,28 @@ setup_run (IORE_params_t *params)
       setup_timers (params->num_repetitions);
 
       setup_aio_backend (params->api);
+
+      curtime = time (NULL);
+      if (curtime == -1)
+	FATAL("Failed to get current timestamp.");
+      params->timestamp_signature = curtime;
     }
 } /* setup_run (IORE_params_t *) */
+
+/*
+ * Clean-up variables of an experiment run.
+ */
+static void
+cleanup_run (IORE_params_t *params)
+{
+  int i;
+
+  for (i = 0; i < NUM_TIMERS; i++)
+    free (timer[i]);
+
+  IORE_MPI_CHECK(MPI_Comm_free (&params->comm),
+		 "Failed to free the MPI communicator.");
+} /* cleanup_run (IORE_params_t *) */
 
 /*
  * Setup a MPI communicator (different from MPI_COMM_WORLD) for a specific
@@ -427,19 +467,41 @@ setup_aio_backend (char *api)
 } /* setup_aio_backend (char *) */
 
 /*
- * Clean-up variables of an experiment run.
+ * Setup buffers and offsets for I/O tests.
  */
 static void
-cleanup_run (IORE_params_t *params)
+setup_io (enum ACCESS_TYPE access, IORE_params_t *params,
+	  IORE_offset_t *offsets, void *buf)
 {
+  int pretend_rank;
   int i;
 
-  for (i = 0; i < NUM_TIMERS; i++)
-    free (timer[i]);
+  pretend_rank = (rank + rank_offset) % params->eff_num_tasks;
 
-  IORE_MPI_CHECK(MPI_Comm_free (&params->comm),
-		 "Failed to free the MPI communicator.");
-} /* cleanup_run (IORE_params_t *) */
+  i = pretend_rank % ARRLENGTH(params->block_sizes);
+  params->block_size = params->block_sizes[i];
+
+  i = pretend_rank % ARRLENGTH(params->transfer_size);
+  params->transfer_size = params->transfer_sizes[i];
+
+  if (params->access_pattern == SEQUENTIAL)
+    offsets = get_sequential_offsets (pretend_rank, params);
+  else
+    /* RANDOM */
+    offsets = get_random_offsets (pretend_rank, params);
+
+  setup_buffer (access, pretend_rank, params, &buf);
+} /* setup_io (enum ACCESS_TYPE, IORE_params_t *, IORE_offset_t *, void *) */
+
+/*
+ * Free memory used for I/O buffers and file offsets.
+ */
+static void
+cleanup_io (IORE_offset_t *offsets, void *buf)
+{
+  free (offsets);
+  free (buf);
+} /* cleanup_io (IORE_offset_t *, void *) */
 
 /*
  * Get current timestamp.
@@ -500,14 +562,11 @@ remove_file (IORE_params_t *params)
 {
   char *file_name = params->file_name;
 
-  if (params->sharing_policy == SHARED_FILE)
+  if (((params->sharing_policy == SHARED_FILE && rank == MASTER_RANK)
+      || params->sharing_policy == FILE_PER_PROCESS)
+      && access (file_name, F_OK == 0))
     {
-      if (rank == MASTER_RANK && access (file_name, F_OK) == 0)
-	backend->delete (params);
-    }
-  else
-    { /* FILE_PER_PROCESS */
-      /* TODO: implement */
+      backend->delete (params);
     }
 } /* remove_file (IORE_params_t *) */
 
@@ -518,25 +577,31 @@ static IORE_size_t
 perform_io (void *fd, enum ACCESS_TYPE access, IORE_offset_t *offsets,
 	    IORE_size_t *buf, IORE_params_t *params)
 {
+  IORE_size_t remaining = params->block_size;
+  IORE_size_t transfer_size = params->transfer_size;
   IORE_size_t data_moved = 0;
   IORE_size_t total_data_moved = 0;
+  IORE_size_t tx;
   int i = 0;
 
   while (offsets[i] != -1)
     {
       params->offset = offsets[i];
 
-      data_moved = backend->io (fd, buf, params->transfer_size, access, params);
+      tx = (transfer_size >= remaining ? remaining : transfer_size);
+
+      data_moved = backend->io (fd, buf, tx, access, params);
       if (data_moved != params->transfer_size)
 	FATALF("Failed to %s %s file.", access == WRITE ? "write" : "read",
 	       access == WRITE ? "to" : "from");
 
+      remaining -= tx;
       total_data_moved += data_moved;
       i++;
     }
 
   return (total_data_moved);
-} /* perform_io (void *, enum ACCESS_TYPE, IORE_params_t *) */
+} /* perform_io (void *, enum ACCESS_TYPE, IORE_params_t *, ...) */
 
 /*
  * Generate the actual name of the file that will be accessed in the test.
@@ -625,3 +690,197 @@ prepend_dir (char *file_name, int num_tasks)
 
   return (dir);
 } /* prepend_dir (char *, int) */
+
+/*
+ * Generate an array of sequential file offsets.
+ */
+static IORE_offset_t *
+get_sequential_offsets (int pretend_rank, IORE_params_t *params)
+{
+  IORE_offset_t *offsets;
+  IORE_size_t block_size = params->block_size;
+  IORE_size_t transfer_size = params->transfer_size;
+  IORE_offset_t first = 0;
+  int n, i, l, q, r;
+
+  /* count the number of offsets */
+  if (block_size % transfer_size == 0)
+    n = block_size / transfer_size;
+  else
+    n = (block_size / transfer_size) + 1;
+
+  /* setup empty array of offsets */
+  offsets = (IORE_offset_t *) malloc ((n + 1) * sizeof(IORE_offset_t));
+  if (offsets == NULL)
+    FATAL("Failed to setup array of offsets.");
+
+  /* mark the end of the offsets */
+  offsets[n] = -1;
+
+  /* fill with file offsets */
+  if (params->sharing_policy == FILE_PER_PROCESS)
+    {
+      for (i = 0; i < n; i++)
+	offsets[i] = i * transfer_size;
+    }
+  else /* SHARED_FILE */
+    {
+      /* compute the first offset of the pretend rank */
+      l = ARRLENGTH(params->block_sizes);
+      q = pretend_rank / l; /* number of integer loops over block sizes */
+      if (q > 0)
+	{
+	  for (i = 0; i < l; i++)
+	    first += params->block_sizes[i];
+	  first *= q;
+	}
+      r = pretend_rank % l; /* remainder loops over block sizes */
+      for (i = 0; i < r; i++)
+	first += params->block_sizes[i];
+
+      for (i = 0; i < n; i++)
+	offsets[i] = first + i * transfer_size;
+    }
+
+  return (offsets);
+} /* get_sequential_offsets (int, IORE_params_t *) */
+
+/*
+ * Generate an array of random file offsets.
+ */
+static IORE_offset_t *
+get_random_offsets (int pretend_rank, IORE_params_t *params)
+{
+  IORE_offset_t *offsets;
+  IORE_offset_t o;
+  IORE_size_t block_size = params->block_size;
+  IORE_size_t transfer_size = params->transfer_size;
+  IORE_size_t *remaining;
+  IORE_size_t file_size = 0;
+  IORE_size_t tx;
+  int seed;
+  int n, i, j;
+  int lb, lt;
+
+  /* setup random */
+  seed = get_random_seed (params->comm);
+  params->rnd_seed = seed;
+  srandom (seed);
+
+  /* count the number of offsets */
+  if (block_size % transfer_size == 0)
+    n = block_size / transfer_size;
+  else
+    n = (block_size / transfer_size) + 1;
+
+  /* setup empty array of offsets */
+  offsets = (IORE_offset_t *) malloc ((n + 1) * sizeof(IORE_offset_t));
+  if (offsets == NULL)
+    FATAL("Failed to setup array of offsets.");
+
+  /* mark the end of the offsets */
+  offsets[n] = -1;
+
+  /* fill with file offsets */
+  if (params->sharing_policy == FILE_PER_PROCESS)
+    {
+      for (i = 0; i < n; i++)
+	offsets[i] = i * transfer_size;
+    }
+  else /* SHARED_FILE */
+    {
+      j = 0;
+      lb = ARRLENGTH(params->block_sizes);
+      lt = ARRLENGTH(params->transfer_size);
+      /* array to guarantee all tasks have its portion of the file */
+      remaining = (IORE_size_t *) malloc (
+	  params->eff_num_tasks * sizeof(IORE_size_t));
+      for (i = 0; i < params->eff_num_tasks; i++)
+	{
+	  remaining[i] = params->block_sizes[i % lb];
+	  file_size += remaining[i];
+	}
+
+      for (o = 0; remaining[pretend_rank] > 0 && o < file_size; o += tx)
+	{
+	  do
+	    i = random () % params->eff_num_tasks;
+	  while (remaining[i] == 0);
+
+	  if (i == pretend_rank)
+	    {
+	      offsets[j] = o;
+	      j++;
+	    }
+
+	  tx = params->transfer_sizes[i % lt];
+	  tx = (tx >= remaining[i] ? remaining[i] : tx);
+	  remaining[i] -= tx;
+	}
+    }
+
+  /* shuffle offsets */
+  for (i = 0; i < n; i++)
+    {
+      j = random () % n;
+      o = offsets[j];
+      offsets[j] = offsets[i];
+      offsets[i] = o;
+    }
+
+  return (offsets);
+} /* get_random_offsets (int, IORE_params_t *) */
+
+/*
+ * Setup the I/O buffer used in read/write tests.
+ */
+static void
+setup_buffer (enum ACCESS_TYPE access, int pretend_rank, IORE_params_t *params,
+	      void **buffer)
+{
+  IORE_size_t transfer_size = params->transfer_size;
+  size_t i;
+  unsigned long long even, odd;
+  unsigned long long *buf;
+
+  *buffer = malloc (transfer_size);
+  if (buffer == NULL)
+    FATAL("Failed to allocate memory for the I/O buffer");
+
+  if (access == WRITE)
+    {
+      /* fill buffer */
+      buf = (unsigned long long *) buffer;
+      even = (unsigned long long) pretend_rank;
+      odd = (unsigned long long) params->timestamp_signature;
+
+      for (i = 0; i < transfer_size / sizeof(unsigned long long); i++)
+	{
+	  if ((i % 2) == 0)
+	    buf[i] = even;
+	  else
+	    buf[i] = odd;
+	}
+    }
+} /* setup_buffer (enum ACCESS_TYPE, int, IORE_params_t *, void **) */
+
+/*
+ * Generates a random seed, broadcasts it to participating tasks and returns.
+ */
+static int
+get_random_seed (MPI_Comm comm)
+{
+  unsigned int seed;
+
+  if (rank == MASTER_RANK)
+    {
+      struct timeval time;
+      gettimeofday (&time, (struct timezone *) NULL);
+      seed = time.tv_usec;
+    }
+
+  IORE_MPI_CHECK(MPI_Bcast(&seed, 1, MPI_INT, 0, comm),
+		 "Failed to broadcast the random seed value.");
+
+  return (seed);
+} /* get_random_seed (MPI_Comm) */

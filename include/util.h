@@ -68,6 +68,13 @@ get_time_string ();
 #define STREQUAL(A, B) strcmp(A, B) == 0
 
 /*
+ * Get the length of an array pointer.
+ *
+ * X: array pointer
+ */
+#define ARRLENGTH(X) (sizeof(X) / sizeof((X)[0]))
+
+/*
  * Displays a custom error message, the MPI error string for a given
  * MPI error, and then exit the program.
  *

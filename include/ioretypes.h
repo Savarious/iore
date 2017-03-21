@@ -64,8 +64,11 @@ typedef struct IORE_params
   int eff_num_tasks; /* effective number of tasks for a run */
   int tasks_per_node; /* number of tasks per compute node */
   int repetition; /* repetition number inside a run */
-  IORE_size_t transfer_size; /* transfer size used by a task */
+  IORE_size_t block_size; /* size of sequential block of data */
+  IORE_size_t transfer_size; /* size of each I/O request */
   IORE_offset_t offset; /* current offset being read/written */
+  int rnd_seed; /* seed for random */
+  unsigned int timestamp_signature; /* timestamp signature used as file data */
 } IORE_params_t;
 
 typedef struct IORE_results
