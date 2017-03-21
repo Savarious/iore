@@ -126,7 +126,7 @@ get_time_string ();
  * IORE_MSG: custom message
  */
 #define ERR(IORE_MSG) do {						\
-    if (verbose <= VERBOSE_2) {						\
+    if (verbose <= CONTROL) {						\
       fprintf(stderr, "IORE ERROR: %s, errno %d, %s.\n", IORE_MSG,	\
 	      errno, strerror(errno));					\
     } else {								\

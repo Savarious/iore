@@ -26,7 +26,7 @@ enum ACCESS_TYPE
 
 enum VERBOSITY
 {
-  BASIC, CONTROL, ENVIRONMENT, TASK
+  BASIC, CONTROL, ENVIRONMENT, TASK, DEBUG
 };
 
 typedef long long int IORE_offset_t;
@@ -69,6 +69,9 @@ typedef struct IORE_params
   IORE_offset_t offset; /* current offset being read/written */
   int rnd_seed; /* seed for random */
   unsigned int timestamp_signature; /* timestamp signature used as file data */
+
+  /* POSIX specific parameters */
+  int single_io_attempt; /* do not retry a transfer if incomplete */
 } IORE_params_t;
 
 typedef struct IORE_results
