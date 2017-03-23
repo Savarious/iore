@@ -44,7 +44,7 @@ cleanup_run (IORE_params_t *);
 static void
 setup_mpi_comm (IORE_params_t *);
 static void
-setup_timers (double **, int);
+setup_timers (int);
 static void
 setup_aio_backend (char *);
 static void
@@ -82,13 +82,15 @@ static IORE_offset_t *
 get_sequential_offsets (int, IORE_params_t *);
 static IORE_offset_t *
 get_random_offsets (int, IORE_params_t *);
+static int
+get_random_seed (MPI_Comm);
 
 /*****************************************************************************
  * D E C L A R A T I O N S                                                   *
  *****************************************************************************/
 
 static int nprocs; /* number of MPI tasks */
-static int rank; /* this task MPI rank */
+int rank; /* this task MPI rank */
 static int rank_offset; /* an offset in number of MPI ranks */
 static enum VERBOSITY verbose; /* verbosity level */
 
@@ -172,7 +174,7 @@ handle_preemptive_args (int argc, char **argv)
     display_version ();
 
   if (h)
-    display_usage ();
+    display_usage (argv);
 
   if (v || h)
     exit (EXIT_SUCCESS);
@@ -268,7 +270,7 @@ exec_write_test (IORE_params_t *params, IORE_results_t *results, int r)
 
   /* write file */
   timer[W_START][r] = get_timestamp ();
-  data_moved = perform_io (params, fd, WRITE);
+  data_moved = perform_io (fd, WRITE, offsets, buf, params);
   timer[W_STOP][r] = get_timestamp ();
 
   if (params->intra_test_barrier)
@@ -327,7 +329,7 @@ exec_read_test (IORE_params_t *params, IORE_results_t *results, int r)
 
   /* read file */
   timer[R_START][r] = get_timestamp ();
-  data_moved = perform_io (params, fd, READ);
+  data_moved = perform_io (fd, READ, offsets, buf, params);
   timer[R_STOP][r] = get_timestamp ();
 
   if (params->intra_test_barrier)
@@ -481,7 +483,7 @@ setup_io (enum ACCESS_TYPE access, IORE_params_t *params,
   i = pretend_rank % ARRLENGTH(params->block_sizes);
   params->block_size = params->block_sizes[i];
 
-  i = pretend_rank % ARRLENGTH(params->transfer_size);
+  i = pretend_rank % ARRLENGTH(params->transfer_sizes);
   params->transfer_size = params->transfer_sizes[i];
 
   if (params->access_pattern == SEQUENTIAL)
@@ -791,7 +793,7 @@ get_random_offsets (int pretend_rank, IORE_params_t *params)
     {
       j = 0;
       lb = ARRLENGTH(params->block_sizes);
-      lt = ARRLENGTH(params->transfer_size);
+      lt = ARRLENGTH(params->transfer_sizes);
       /* array to guarantee all tasks have its portion of the file */
       remaining = (IORE_size_t *) malloc (
 	  params->eff_num_tasks * sizeof(IORE_size_t));

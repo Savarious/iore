@@ -109,7 +109,7 @@ posix_io (void *file, IORE_size_t *buf, IORE_size_t length,
   int fd = *(int *) file;
   long long remainder = (long long) length;
   char *b = (char *) buf;
-  enum VERBOSE verbose = params->verbose;
+  enum VERBOSITY verbose = params->verbose;
 
   if (lseek64 (fd, params->offset, SEEK_SET) == -1)
     FATAL("File offset reposition failed.");
