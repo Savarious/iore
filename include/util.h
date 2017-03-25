@@ -1,6 +1,11 @@
 #ifndef _UTIL_H
 #define _UTIL_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
 /******************************************************************************
  * D E F I N I T I O N S
  ******************************************************************************/
@@ -68,5 +73,24 @@ enum timer
     D_STOP,
     NUM_TIMERS
   };
+
+/******************************************************************************
+ * M A C R O S
+ ******************************************************************************/
+
+/*
+ * Compares two strings for equality.
+ */
+#define STREQUAL(A, B) (strcmp(A, B) == 0)
+
+/*
+ * Display a fatal pre-formatted error message.
+ */
+#define FATAL(MSG)						\
+  do {								\
+    fprintf(stderr, "IORE_FATAL: %s, errno %d, %s (%s:%d).\n",	\
+	    MSG, errno, strerror(errno), __FILE__, __LINE__);	\
+    fflush(stderr);						\
+  } while(0)
 
 #endif /* _UTIL_H */

@@ -1,7 +1,6 @@
 #ifndef _IORE_RUN_H
 #define _IORE_RUN_H
 
-#include "util.h"
 #include "iore_params.h"
 #include "iore_results.h"
 
@@ -17,5 +16,14 @@ typedef struct iore_run
   iore_results_t results; /* results of all repetitions */
   struct iore_run *next; /* next run */
 } iore_run_t;
+
+/******************************************************************************
+ * P R O T O T Y P E S
+ ******************************************************************************/
+
+/*
+ * Create an experiment run with ID and params.
+ */
+iore_run_t *new_run (int, iore_params_t *);
 
 #endif /* _IORE_RUN_H */

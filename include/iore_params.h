@@ -40,4 +40,13 @@ typedef struct iore_params
   int single_io_attempt; /* do not retry a transfer if incomplete */
 } iore_params_t;
 
+/******************************************************************************
+ * P R O T O T Y P E S
+ ******************************************************************************/
+
+/*
+ * Create a default parameter structure.
+ */
+iore_params_t *new_params ();
+
 #endif /* _IORE_PARAMS_H */
