@@ -84,12 +84,49 @@ enum timer
 #define STREQUAL(A, B) (strcmp(A, B) == 0)
 
 /*
+ * Prepare a custom formatted message.
+ */
+#define FMTMSG(FMT, ...)			\
+  char msg[MAX_STR_LEN];			\
+  sprintf(msg, FMT, __VA_ARGS__);		\
+
+/*
  * Display a fatal pre-formatted error message.
  */
 #define FATAL(MSG)						\
   do {								\
-    fprintf(stderr, "IORE_FATAL: %s, errno %d, %s (%s:%d).\n",	\
+    fprintf(stderr, "IORE FATAL: %s, errno %d, %s (%s:%d).\n",	\
 	    MSG, errno, strerror(errno), __FILE__, __LINE__);	\
+    fflush(stderr);						\
+  } while(0)
+
+/*
+ * Format and display a fatal message.
+ */
+#define FATALF(FMT, ...)					\
+  do {								\
+    FMTMSG(FMT, __VA_ARGS__);					\
+    fprintf(stderr, "IORE FATAL: %s, errno %d, %s (%s:%d).\n",	\
+	    msg, errno, strerror(errno), __FILE__, __LINE__);	\
+    fflush(stderr);						\
+  } while(0)
+
+/*
+ * Display a pre-formatted error message.
+ */
+#define ERR(MSG)				\
+  do {						\
+    fprintf(stderr, "IORE ERROR: %s.\n", MSG);	\
+    fflush(stderr);				\
+  } while(0)
+
+/*
+ * Format and display an error message.
+ */
+#define ERRF(FMT, ...)						\
+  do {								\
+    FMTMSG(FMT, __VA_ARGS__);					\
+    fprintf(stderr, "IORE ERROR: %s.\n", msg);			\
     fflush(stderr);						\
   } while(0)
 

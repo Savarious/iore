@@ -11,7 +11,7 @@
 typedef struct iore_experiment
 {
   iore_run_t *front; /* first run */
-  iore_run_t *tail; /* last run */
+  iore_run_t *rear; /* last run */
   int size; /* number of runs */
 } iore_experiment_t;
 

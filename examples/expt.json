@@ -1,0 +1,41 @@
+{
+    "runs" : [
+	{
+	    "params" : {
+		"num_tasks" : 2,
+		"api" : "POSIX",
+		"sharing_policy" : "SHARED_FILE",
+		"block_sizes" : [ "512K", "1M" ],
+		"transfer_sizes" : [ "256K", "300K" ],
+		"write_test" : true,
+		"read_test" : false,
+		"ref_num" : 1000,
+		"root_file_name" : "expt_file",
+		"num_repetitions" : 2,
+		"inter_test_delay" : 1,
+		"intra_test_barrier" : true,
+		"run_time_limit" : 5,
+		"keep_file" : true,
+	    }
+	},
+	{
+	    "params" : {
+		"num_tasks" : 3,
+		"api" : "POSIX",
+		"sharing_policy" : "FILE_PER_PROCESS",
+		"access_pattern" : "RANDOM",
+		"block_sizes" : [ "1M", "10M" ],
+		"transfer_sizes" : [ "2M", "1M" ],
+		"write_test" : true,
+		"read_test" : true,
+		"ref_num" : 2000,
+		"root_file_name" : "expt_file2",
+		"dir_per_file" : true,
+		"reorder_tasks" : true,
+		"reorder_tasks_offset" : 1,
+		"verbosity" : "DEBUG",
+		"single_io_attempt" : true
+	    }
+	}
+    ]
+}
