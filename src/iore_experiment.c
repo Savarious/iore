@@ -285,9 +285,52 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 	      !(STREQUAL(param->u.string.ptr, "SHARED_FILE") ||
 		STREQUAL(param->u.string.ptr, "FILE_PER_PROCESS")))
 	    {
+	      strcat(errmsg_acc,
+		     "sharing_policy must be either \"SHARED_FILE\""
+		     "or \"FILE_PER_PROCESS\"");
+	      num_errors++;
+	    }
+	  else
+	    {
+	      iore_params->sharing_policy = STREQUAL(param->u.string.ptr,
+						     "SHARED_FILE") ?
+		SHARED_FILE : FILE_PER_PROCESS;
+	    }
+	}
+      else if (STREQUAL(param_name, "access_pattern"))
+	{
+	  if (param->type != json_string ||
+	      !(STREQUAL(param->u.string.ptr, "SEQUENTIAL") ||
+		STREQUAL(param->u.string.ptr, "FILE_PER_PROCESS")))
+	    {
+	      strcat(errmsg_acc,
+		     "access_pattern must be either \"SEQUENTIAL\""
+		     "or \"RANDOM\"");
+	      num_errors++;
+	    }
+	  else
+	    {
+	      iore_params->access_pattern = STREQUAL(param->u.string.ptr,
+						     "SEQUENTIAL") ?
+		SEQUENTIAL : FILE_PER_PROCESS;
+	    }
+	}
+      else if (STREQUAL(param_name, "block_sizes"))
+	{
+	  if (!(param->type == json_integer ||
+		param->type == json_string ||
+		param->type == json_array))
+	    {
+	      strcat(errmsg_acc, "block_sizes must be a string formed by "
+		     "an integer number of bytes, "
+		     "a string formed by an integer plus a unit, "
+		     "or an array of integers or of integers plus units");
+	      num_errors++;
+	    }
+	  else
+	    {
 	      /* TODO: continue... */
 	    }
 	}
-	  
     } /* end of loop over parameters */ 
 } /* parse_file_params (json_value *, iore_params_t *) */
