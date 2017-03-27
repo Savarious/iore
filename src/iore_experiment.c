@@ -238,6 +238,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
   char *param_name;
   int num_params;
   int num_errors = 0;
+  char *errmsg_acc = NULL;
   int i;
   
   /* no need to check for params == NULL; if so, run with default */
@@ -256,10 +257,35 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 
       if (STREQUAL(param_name, "num_tasks"))
 	{
-	  if (param->type != json_integer)
+	  if (param->type != json_integer || param->u.integer < 0)
 	    {
+	      strcat(errmsg_acc, "num_tasks must be a positive integer");
 	      num_errors++;
-	      /* TODO: create an error message, but do not display it now */
+	    }
+	  else
+	    {
+	      iore_params->num_tasks = param->u.integer;
+	    }
+	}
+      else if (STREQUAL(param_name, "api"))
+	{
+	  if (param->type != json_string)
+	    {
+	      strcat(errmsg_acc, "api must be a string");
+	      num_errors++;
+	    }
+	  else
+	    {
+	      strcpy(iore_params->api, param->u.string.ptr);
+	    }
+	}
+      else if (STREQUAL(param_name, "sharing_policy"))
+	{
+	  if (param->type != json_string ||
+	      !(STREQUAL(param->u.string.ptr, "SHARED_FILE") ||
+		STREQUAL(param->u.string.ptr, "FILE_PER_PROCESS")))
+	    {
+	      /* TODO: continue... */
 	    }
 	}
 	  
