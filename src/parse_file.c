@@ -240,7 +240,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 	{
 	  if (param->type != json_string ||
 	      !(STREQUAL(param->u.string.ptr, "SEQUENTIAL") ||
-		STREQUAL(param->u.string.ptr, "FILE_PER_PROCESS")))
+		STREQUAL(param->u.string.ptr, "RANDOM")))
 	    {
 	      strcat(errmsg_acc,
 		     "access_pattern must be either \"SEQUENTIAL\""
@@ -251,7 +251,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 	    {
 	      iore_params->access_pattern = STREQUAL(param->u.string.ptr,
 						     "SEQUENTIAL") ?
-		SEQUENTIAL : FILE_PER_PROCESS;
+		SEQUENTIAL : RANDOM;
 	    }
 	}
       else if (STREQUAL(param_name, "block_sizes"))
