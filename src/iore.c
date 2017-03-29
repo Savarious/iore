@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <mpi.h>
 
-#include "iore.h"
 #include "iore_experiment.h"
 #include "iore_run.h"
 #include "iore_params.h"
