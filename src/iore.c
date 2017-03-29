@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <mpi.h>
 
+#include "iore.h"
 #include "iore_experiment.h"
 #include "iore_run.h"
 #include "iore_params.h"
@@ -125,7 +126,7 @@ init_mpi (int argc, char **argv)
 	       "Failed to get the MPI rank.");
 
   /* initialize task context */
-  task = new_task(nprocs, rank);
+  task = new_task(nprocs, rank, MPI_COMM_WORLD);
 } /* init_mpi (int, char **) */
 
 static void

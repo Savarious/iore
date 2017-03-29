@@ -26,6 +26,6 @@ typedef struct iore_task
 /*
  * Create a new task context.
  */
-iore_task_t *new_task(int, int);
+iore_task_t *new_task(int, int, MPI_Comm);
 
 #endif /* _IORE_TASK_H */

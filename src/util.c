@@ -1,14 +1,17 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <mpi.h>
 
 #include "util.h"
 #include "iore_task.h"
+#include "iore.h"
 
 /*****************************************************************************
  * G L O B A L S
  *****************************************************************************/
 
-extern iore_task_t *task;
+/*extern iore_task_t *task;*/
 
 /******************************************************************************
  * F U N C T I O N S
@@ -25,9 +28,7 @@ current_time_str()
 
   curtime = time (NULL);
   if (curtime == -1)
-    {
       FATAL("Failed to get current time.");
-    }
   else
     {
       curtimestr = ctime(&curtime);
@@ -44,9 +45,10 @@ current_time_str()
 iore_time_t
 current_time()
 {
-  double wtime;
-
+  iore_time_t wtime = 0;
+  
   wtime = MPI_Wtime();
+  
   if (wtime < 0)
     FATAL("Failed to get timestamp using MPI_Wtime().");
 

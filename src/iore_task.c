@@ -17,25 +17,29 @@ static void set_wclock_deviation (iore_task_t *);
  * Create a new task context.
  */
 iore_task_t
-*new_task (int nprocs, int rank)
+*new_task (int nprocs, int rank, MPI_Comm comm)
 {
   iore_task_t *task;
 
   task = (iore_task_t *) malloc(sizeof(iore_task_t));
   task->nprocs = nprocs;
   task->rank = rank;
+  task->comm = comm;
+  task->verbosity = NORMAL;
+  task->wclock_delta = 0;
+  task->wclock_skew_all = 0;
 
   set_wclock_deviation(task);
 
   return (task);
-} /* new_task (int, int) */
+} /* new_task (int, int, MPI_Comm) */
 
 static void
 set_wclock_deviation (iore_task_t *task)
 {
   iore_time_t time;
-  iore_time_t min;
-  iore_time_t max;
+  iore_time_t min = 0;
+  iore_time_t max = 0;
   iore_time_t master_time;
   
   MPI_TRYCATCH(MPI_Barrier(MPI_COMM_WORLD), "Failed tasks synchronization.");
