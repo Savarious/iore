@@ -33,9 +33,9 @@
 		"dir_per_file" : true,
 		"reorder_tasks" : true,
 		"reorder_tasks_offset" : 1,
-		"verbosity" : "DEBUG",
 		"single_io_attempt" : true
 	    }
 	}
-    ]
+    ],
+    "verbosity" : "DEBUG"
 }

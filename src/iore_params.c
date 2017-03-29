@@ -47,7 +47,6 @@ new_params ()
   params->dir_per_file = FALSE;
   params->reorder_tasks = FALSE;
   params->reorder_tasks_offset = 0;
-  params->verbosity = NORMAL;
 
   params->single_io_attempt = FALSE;
 

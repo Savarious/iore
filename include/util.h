@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <mpi.h>
 
 /******************************************************************************
  * D E F I N I T I O N S
@@ -75,6 +76,13 @@ enum timer
   };
 
 /******************************************************************************
+ * P R O T O T Y P E S
+ ******************************************************************************/
+
+char *current_time_str();
+iore_time_t current_time();
+
+/******************************************************************************
  * M A C R O S
  ******************************************************************************/
 
@@ -128,6 +136,44 @@ enum timer
     FMTMSG(FMT, __VA_ARGS__);					\
     fprintf(stderr, "IORE ERROR: %s.\n", msg);			\
     fflush(stderr);						\
+  } while(0)
+
+/*
+ * Displays a pre-formatted warning message.
+ */
+#define WARN(MSG)					\
+  do {							\
+    fprintf(stderr, "IORE WARNING: %s.\n", MSG);	\
+    fflush(stderr);					\
+  } while(0)
+
+/*
+ * Formats and displays a warning message.
+ */
+#define WARNF(FMT, ...)				 \
+  do {						 \
+    FMTMSG(FMT, __VA_ARGS__);			 \
+    fprintf(stderr, "IORE WARNING: %s.\n", msg); \
+    fflush(stderr);				 \
+  } while(0)
+
+/*
+ * Checks the return code of an MPI fuction. If an error occurs, displays a
+ * combined custom and error message, and aborts the program execution.
+ */
+#define MPI_TRYCATCH(ERRCODE, MSG)					\
+  do {									\
+    if (ERRCODE != MPI_SUCCESS)						\
+      {									\
+	char errstr[MPI_MAX_ERROR_STRING];				\
+	int errstrlen;							\
+									\
+	MPI_Error_string(ERRCODE, errstr, &errstrlen);			\
+	fprintf(stderr, "IORE FATAL: %s, MPI %s, (%s:%d)\n", MSG,	\
+		errstr, __FILE__, __LINE__);				\
+	fflush(stderr);							\
+	MPI_Abort(MPI_COMM_WORLD, -1);					\
+      }									\
   } while(0)
 
 #endif /* _UTIL_H */

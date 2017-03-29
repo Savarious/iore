@@ -35,8 +35,10 @@ parse_file (char *file_name, iore_experiment_t *experiment)
   json_char *json;
   json_value *root;
   json_value *runs;
+  json_value *verbosity;
   int num_runs;
-  int i;
+  int length;
+  int i, j;
 
   file_data = get_file_data(file_name);
 
@@ -57,40 +59,79 @@ parse_file (char *file_name, iore_experiment_t *experiment)
       MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
-  /* TODO: check object names? */
   
-  runs = root->u.object.values[0].value;
-  if (runs == NULL || runs->type != json_array)
+  length = root->u.object.length;
+  for (i = 0; i < length; i++)
     {
-      ERR("Experiment definition file is wrongly formatted.");
-      free(file_data);
-      MPI_Abort(MPI_COMM_WORLD, -1);
-    }
+      if (STREQUAL(root->u.object.values[i].name, "runs"))
+	{
+	  runs = root->u.object.values[i].value;
+	  if (runs == NULL || runs->type != json_array)
+	    {
+	      ERR("Experiment definition file is wrongly formatted.");
+	      free(file_data);
+	      MPI_Abort(MPI_COMM_WORLD, -1);
+	    }
 
-  num_runs = runs->u.array.length;
-  if (num_runs == 0)
-    {
-      ERR("No run defined for the experiment; aborting.");
-      free(file_data);
-      MPI_Abort(MPI_COMM_WORLD, -1);
+	    /* TODO: check object names? */
+	  
+	  num_runs = runs->u.array.length;
+	  if (num_runs == 0)
+	    {
+	      ERR("No run defined for the experiment; aborting.");
+	      free(file_data);
+	      MPI_Abort(MPI_COMM_WORLD, -1);
+	    }
+	  /* loop over runs */
+	  for (j = 0; j < num_runs; j++)
+	    {
+	      if (iore_run == NULL)
+		{ /* if the first run, change the default parameters */
+		  iore_run = experiment->front;
+		}
+	      else
+		{ /* create a new run and add to the linked list */
+		  iore_run->next = new_run(j, new_params());
+		  iore_run = iore_run->next;
+		}
+	      
+	      parse_file_run(runs->u.array.values[j], iore_run);      
+	    } /* end of loop over runs */
+	  
+	  experiment->rear = iore_run;
+	  experiment->size = num_runs;
+	}
+      else if (STREQUAL(root->u.object.values[i].name, "verbosity"))
+	{
+	  verbosity = root->u.object.values[i].value;
+	  if (verbosity->type != json_string)
+	    {
+	      ERR("Experiment definition file is wrongly formatted.");
+	      free(file_data);
+	      MPI_Abort(MPI_COMM_WORLD, -1);
+	    }
+	  else
+	    {
+	      if (STREQUAL(verbosity->u.string.ptr, "QUIET"))
+		experiment->verbosity = QUIET;
+	      else if (STREQUAL(verbosity->u.string.ptr, "NORMAL"))
+		experiment->verbosity = NORMAL;
+	      else if (STREQUAL(verbosity->u.string.ptr, "VERBOSE"))
+		experiment->verbosity = VERBOSE;
+	      else if (STREQUAL(verbosity->u.string.ptr, "VERY_VERBOSE"))
+		experiment->verbosity = VERY_VERBOSE;
+	      else if (STREQUAL(verbosity->u.string.ptr, "DEBUG"))
+		experiment->verbosity = DEBUG;
+	      else
+		{
+		  ERR("Invalid verbosity level; options are: QUIET, NORMAL, "
+		      "VERBOSE, VERY_VERBOSE, and DEBUG.");
+		  free(file_data);
+		  MPI_Abort(MPI_COMM_WORLD, -1);
+		}
+	    }
+	}
     }
-  /* loop over runs */
-  for (i = 0; i < num_runs; i++)
-    {
-      if (iore_run == NULL)
-	{ /* if the first run, change the default parameters */
-	  iore_run = experiment->front;
-	}
-      else
-	{ /* create a new run and add to the linked list */
-	  iore_run->next = new_run(i, new_params());
-	  iore_run = iore_run->next;
-	}
-      
-      parse_file_run(runs->u.array.values[i], iore_run);      
-    } /* end of loop over runs */
-
-  experiment->rear = iore_run;
   
   json_value_free(root);
   free(file_data);
@@ -583,36 +624,6 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 	  else
 	    {
 	      iore_params->reorder_tasks_offset = param->u.integer;
-	    }
-	}
-      else if (STREQUAL(param_name, "verbosity"))
-	{
-	  if (param->type != json_string)
-	    {
-	      strcat(errmsg_acc, "verbosity must be one of the following: "
-		     "\"QUIET\", \"NORMAL\", \"VERBOSE\", \"VERY_VERBOSE\", "
-		     "\"DEBUG\"\n");
-	      num_errors++;
-	    }
-	  else
-	    {
-	      if (STREQUAL(param->u.string.ptr, "QUIET"))
-		iore_params->verbosity = QUIET;
-	      else if (STREQUAL(param->u.string.ptr, "NORMAL"))
-		iore_params->verbosity = NORMAL;
-	      else if (STREQUAL(param->u.string.ptr, "VERBOSE"))
-		iore_params->verbosity = VERBOSE;
-	      else if (STREQUAL(param->u.string.ptr, "VERY_VERBOSE"))
-		iore_params->verbosity = VERY_VERBOSE;
-	      else if (STREQUAL(param->u.string.ptr, "DEBUG"))
-		iore_params->verbosity = DEBUG;
-	      else
-		{
-		  strcat(errmsg_acc, "verbosity must be one of the following: "
-			 "\"QUIET\", \"NORMAL\", \"VERBOSE\", \"VERY_VERBOSE\","
-			 " \"DEBUG\"\n");
-		  num_errors++;
-		}
 	    }
 	}
       else if (STREQUAL(param_name, "single_io_attempt"))

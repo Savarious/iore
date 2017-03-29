@@ -22,4 +22,10 @@ typedef struct iore_aio
   (*io) (void *, iore_size_t *, iore_size_t, access_t, iore_params_t *);
 } iore_aio_t;
 
+/******************************************************************************
+ * D E C L A R A T I O N S
+ ******************************************************************************/
+
+iore_aio_t ioreaio_posix;
+
 #endif /* _IORE_AIO_H */

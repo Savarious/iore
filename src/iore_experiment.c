@@ -41,6 +41,7 @@ new_experiment (int argc, char **argv)
   experiment->front = run;
   experiment->rear = run;
   experiment->size = 1;
+  experiment->verbosity = NORMAL;
 
   parse_opts(argc, argv, experiment);
   

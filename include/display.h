@@ -8,5 +8,6 @@
 void display_version();
 void display_usage(char **);
 void display_splash();
+void display_expt_header(char **);
 
 #endif /* _DISPLAY_H */

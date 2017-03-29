@@ -34,7 +34,6 @@ typedef struct iore_params
   int dir_per_file; /* create an individual directory for each test file */
   int reorder_tasks; /* in read tests, a task reads offsets of other task */
   int reorder_tasks_offset; /* distances in number of nodes for reordering */
-  verbosity_t verbosity; /* verbosity level */
 
   /* POSIX specific parameters */
   int single_io_attempt; /* do not retry a transfer if incomplete */

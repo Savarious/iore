@@ -13,6 +13,7 @@ typedef struct iore_experiment
   iore_run_t *front; /* first run */
   iore_run_t *rear; /* last run */
   int size; /* number of runs */
+  verbosity_t verbosity; /* verbosity level */
 } iore_experiment_t;
 
 /******************************************************************************
