@@ -313,6 +313,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 		  iore_params->block_sizes =
 		    (iore_size_t *) malloc(sizeof(iore_size_t));
 		  iore_params->block_sizes[0] = param->u.integer;
+		  iore_params->block_sizes_length = 1;
 		}
 	    }
 	  else if (param->type == json_string)
@@ -326,6 +327,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 		  strcat(errmsg_acc, "block_sizes must be greater than 0\n");
 		  num_errors++;
 		}
+	      iore_params->block_sizes_length = 1;
 	    }
 	  else if (param->type == json_array)
 	    {
@@ -367,6 +369,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 		      num_errors++;
 		    }
 		}
+	      iore_params->block_sizes_length = length;
 	    }
 	  else
 	    {
@@ -391,6 +394,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 		  iore_params->transfer_sizes =
 		    (iore_size_t *) malloc(sizeof(iore_size_t));
 		  iore_params->transfer_sizes[0] = param->u.integer;
+		  iore_params->transfer_sizes_length = 1;
 		}
 	    }
 	  else if (param->type == json_string)
@@ -404,6 +408,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 		  strcat(errmsg_acc, "transfer_sizes must be greater than 0\n");
 		  num_errors++;
 		}
+	      iore_params->transfer_sizes_length = 1;
 	    }
 	  else if (param->type == json_array)
 	    {
@@ -445,6 +450,7 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 		      num_errors++;
 		    }
 		}
+	      iore_params->transfer_sizes_length = length;
 	    }
 	  else
 	    {
@@ -644,6 +650,12 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
 	    }
 	}
     } /* end of loop over parameters */
+
+  if (num_errors > 0)
+    {
+      ERRF("Errors were found in the parameters definitions:\n%s", errmsg_acc);
+      MPI_Abort(MPI_COMM_WORLD, -1);
+    }
 } /* parse_file_params (json_value *, iore_params_t *) */
 
 /*

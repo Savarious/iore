@@ -23,6 +23,10 @@ all:
 	mkdir -p $(BINDIR)
 	$(CC) $(SRCDIR)/*.c $(CFLAGS) -o $(BINDIR)/$(EXEC)
 
+# Debug
+debug: CFLAGS += -g
+debug: all
+
 # Cleans compilation files
 clean:
 	rm -f $(BINDIR)/$(EXEC)

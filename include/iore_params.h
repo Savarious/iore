@@ -37,6 +37,10 @@ typedef struct iore_params
 
   /* POSIX specific parameters */
   int single_io_attempt; /* do not retry a transfer if incomplete */
+
+  /* control parameters not provided by the user */
+  int block_sizes_length;
+  int transfer_sizes_length;
 } iore_params_t;
 
 /******************************************************************************

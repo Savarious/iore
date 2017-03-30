@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <mpi.h>
 
 #include "iore_experiment.h"
@@ -19,6 +20,13 @@ static int handle_preemptive_args (int, char **);
 /* MPI related functions */
 static void init_mpi (int, char**);
 static void finalize_mpi ();
+static void setup_mpi_comm (iore_params_t *);
+/* experiment execution related functions */
+static void exec_run (iore_run_t *);
+static void setup_run (iore_params_t *);
+static void setup_timers (int);
+static void bind_aio_backend (char *);
+static void setup_data_signature ();
 
 /*****************************************************************************
  * G L O B A L S
@@ -34,7 +42,7 @@ iore_task_t *task;
 /* I/O APIs available */
 static iore_aio_t *available_aio[] = {
 #ifdef USE_POSIX_AIO
-  &ioreaio_posix,
+  &iore_aio_posix,
 #endif
   NULL
 };
@@ -47,13 +55,12 @@ int
 main (int argc, char **argv)
 {
   iore_experiment_t *experiment;
+  iore_run_t *run;
   
   init_mpi(argc, argv);
   
   if (!handle_preemptive_args(argc, argv))
     {
-      display_splash();
-
       /* sanity check */
       if (available_aio[0] == NULL)
 	{
@@ -65,8 +72,17 @@ main (int argc, char **argv)
       experiment = new_experiment(argc, argv);
       task->verbosity = experiment->verbosity;
       /* TODO: validate experiments? */
-      display_expt_header(argv);
+      sync_rand_gen(MPI_COMM_WORLD);
+
+      display_splash();
       
+      display_expt_header(argc, argv);
+
+      /* loop over experiment runs */
+      for (run = experiment->front; run != NULL; run = run->next)
+	exec_run(run);
+
+      /* TODO: continue with results output... */
     }
 
   finalize_mpi();
@@ -128,6 +144,9 @@ init_mpi (int argc, char **argv)
   task = new_task(nprocs, rank, MPI_COMM_WORLD);
 } /* init_mpi (int, char **) */
 
+/*
+ * Gracefully finalize MPI environment and other variables.
+ */
 static void
 finalize_mpi ()
 {
@@ -135,3 +154,131 @@ finalize_mpi ()
   
   MPI_TRYCATCH(MPI_Finalize(), "Failed to gracefully finalizing MPI.");
 } /* finalize_mpi() */
+
+/*
+ * Setup the MPI communicator used for a specific experiment run.
+ */
+static void
+setup_mpi_comm (iore_params_t *params)
+{
+  MPI_Comm newcomm;
+  MPI_Group group, newgroup;
+  int range[3];
+
+  /* if the number of tasks requested is greater than the available in the
+     communicator, use the available */
+  if (params->num_tasks > task->nprocs)
+    {
+      if (task->verbosity >= NORMAL && task->rank == MASTER_RANK)
+	{
+	  WARNF("More tasks requested (%d) than available (%d); "
+		"running on %d tasks", params->num_tasks, task->nprocs,
+		task->nprocs);
+	}
+      params->num_tasks = task->nprocs;
+    }
+
+  /* create an MPI communicator for this run */
+  MPI_TRYCATCH(MPI_Comm_group(MPI_COMM_WORLD, &group),
+	       "Failed to get current MPI group.");
+  range[0] = 0; /* first rank */
+  range[1] = params->num_tasks - 1; /* last rank */
+  range[2] = 1; /* stride */
+  MPI_TRYCATCH(MPI_Group_range_incl(group, 1, &range, &newgroup),
+	       "Failed to define new MPI group.");
+  MPI_TRYCATCH(MPI_Comm_create(MPI_COMM_WORLD, newgroup, &newcomm),
+	       "Failed to create new MPI communicator.");
+
+  task->comm = newcomm;
+} /* setup_mpi_comm (iore_params_t *) */
+
+/*
+ * Execute all iterations of an experiment run.
+ */
+static void
+exec_run (iore_run_t *run)
+{
+  iore_params_t *params = &run->params;
+
+  setup_run(params);
+  display_run_info(run->id, params);
+  
+  /* only tasks participating in this run */
+  if (task->comm != MPI_COMM_NULL)
+    {
+      /* TODO: continue... */
+    }
+
+  /* TODO: cleanup run */
+  
+} /* exec_run (iore_run_t *) */
+
+/*
+ * Prepare the execution of an experiment run.
+ */
+static void
+setup_run (iore_params_t *params)
+{
+  setup_mpi_comm (params);
+
+  /* only tasks participating in this run */
+  if (task->comm != MPI_COMM_NULL)
+    {
+      setup_timers(params->num_repetitions);
+      bind_aio_backend(params->api);
+      setup_data_signature();
+    }
+} /* setup_run (iore_params_t *) */
+
+/*
+ * Reset performance timers to collect results from an experiment run.
+ */ 
+static void
+setup_timers (int num_repetitions)
+{
+  int i;
+  for (i = 0; i < NUM_TIMERS; i++)
+    {
+      task->timer[i] = (double *) malloc(num_repetitions * sizeof(iore_time_t));
+      if (task->timer[i] == NULL)
+	FATAL("Failed to setup performance timers.");
+    }
+} /* setup_timers (int) */
+
+/*
+ * Bind an abstract I/O implementation to the backend.
+ */
+static void
+bind_aio_backend (char *api)
+{
+  iore_aio_t *backend = NULL;
+  iore_aio_t **aio = available_aio;
+
+  while (*aio != NULL && backend == NULL)
+    {
+      if (STREQUAL(api, (*aio)->name))
+	backend = *aio;
+
+      aio++;
+    }
+
+  if (backend == NULL)
+    FATALF("Unrecognized abstract I/O API: %s.", api);
+  else
+    task->aio_backend = backend;
+} /* bind_aio_backend (char *) */
+
+/*
+ * Generates a data signatures to be used in write tests.
+ */
+static void
+setup_data_signature ()
+{
+  time_t curtime;
+
+  curtime = time(NULL);
+  if (curtime == -1)
+    FATAL("Failed to generate data signature.");
+
+  task->data_signature = curtime;
+} /* setup_data_signature () */

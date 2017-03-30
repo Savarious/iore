@@ -55,7 +55,8 @@ set_wclock_deviation (iore_task_t *task)
 	       "Failed to reduce tasks' timestamps.");
 
   /* compute wall-clock time delta comparing with master rank time */
-  master_time = time;
+  if (task->rank == MASTER_RANK)
+    master_time = time;
   MPI_TRYCATCH(MPI_Bcast(&master_time, 1, MPI_DOUBLE, MASTER_RANK,
 			 MPI_COMM_WORLD),
 	       "Failed to broadcast master rank time.");

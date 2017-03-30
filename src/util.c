@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/time.h>
+#include <sys/param.h> /* MAXPATHLEN */
+#include <string.h>
 #include <mpi.h>
 
 #include "util.h"
@@ -55,3 +58,104 @@ current_time()
 
   return (wtime);
 } /* current_time() */
+
+/*
+ * Synchronize random number generation across all tasks in an MPI communicator
+ * through broadcasting a seed from the master rank.
+ */
+void
+sync_rand_gen(MPI_Comm comm)
+{
+  unsigned int seed;
+  struct timeval time;
+
+  if (task->rank == 0)
+    {
+      gettimeofday(&time, (struct timezone *) NULL);
+      seed = time.tv_usec;
+    }
+
+  MPI_TRYCATCH(MPI_Bcast(&seed, 1, MPI_INT, MASTER_RANK, comm),
+	       "Failed to broadcast the seed for the PRNG");
+
+  srandom(seed);
+} /* sync_rand_gen(MPI_Comm) */
+
+/*
+ * Get a size in bytes in a more human readable unit.
+ * Considers base two units: KiB, MiB, GiB.
+ */
+char *
+human_readable(iore_size_t size)
+{
+  char *size_str = (char *) malloc (MAX_STR_LEN * sizeof(char));
+  
+  if (size >= TEBIBYTE)
+    {
+      if ((size % (iore_size_t) TEBIBYTE) == 0)
+	sprintf(size_str, "%lli TiB", (size / TEBIBYTE));
+      else
+	sprintf(size_str, "%.3f TiB", ((double) size / TEBIBYTE));
+    }
+  else if (size >= GIBIBYTE)
+    {
+      if ((size % (iore_size_t) GIBIBYTE) == 0)
+	sprintf(size_str, "%lli GiB", (size / GIBIBYTE));
+      else
+	sprintf(size_str, "%.3f GiB", ((double) size / GIBIBYTE));
+    }
+  else if (size >= MEBIBYTE)
+    {
+      if ((size % (iore_size_t) MEBIBYTE) == 0)
+	sprintf(size_str, "%lli MiB", (size / MEBIBYTE));
+      else
+	sprintf(size_str, "%.3f MiB", ((double) size / MEBIBYTE));
+    }
+  else if (size >= KIBIBYTE)
+    {
+      if ((size % (iore_size_t) KIBIBYTE) == 0)
+	sprintf(size_str, "%lli KiB", (size / KIBIBYTE));
+      else
+	sprintf(size_str, "%.3f KiB", ((double) size / KIBIBYTE));
+    }
+  else if (size >= 1)
+    sprintf(size_str, "%f B", ((double) size));
+  else
+    sprintf(size_str, "-");
+
+  return (size_str);
+} /* human_readable(iore_size_t) */
+
+/*
+ * Returns the path of the parent directory of the file/directory addressed by
+ * the path argument.
+ */
+char *
+get_parent_path(char *path)
+{
+  int i;
+  char *parent;
+  int found = FALSE;
+
+  parent = (char *) malloc(MAXPATHLEN * sizeof(char));
+
+  /* ignores the last char to cope with path to directory ending with / */
+  i = strlen(path) - 1;
+  while (i > 0 && !found)
+    {
+      if (path[i] == '/')
+	{
+	  strncpy(parent, path, i);
+	  found = TRUE;
+	}
+
+      i--;
+    }
+
+  if (!found)
+    parent[0] = '.';
+  
+  parent[i+1] = '\0';
+
+  return (parent);
+} /* get_parent_path(char *) */

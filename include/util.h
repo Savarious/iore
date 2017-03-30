@@ -26,6 +26,10 @@
 #define MASTER_RANK 0 /* MPI master rank */
 #define MAX_RETRIES 10000 /* max number of retries for POSIX I/O */
 #define MAX_STR_LEN 1024 /* max length of a string inside the program */
+#define KIBIBYTE (1 << 10) /* 1 KiB */
+#define MEBIBYTE (1 << 20) /* 1 MiB */
+#define GIBIBYTE (1 << 30) /* 1 GiB */
+#define TEBIBYTE (1L << 40) /* 1 TiB */
 
 /* enumeration of supported verbosity levels */
 typedef enum verbosity
@@ -81,6 +85,9 @@ enum timer
 
 char *current_time_str();
 iore_time_t current_time();
+void sync_rand_gen(MPI_Comm);
+char *human_readable(iore_size_t);
+char *get_parent_path(char *);
 
 /******************************************************************************
  * M A C R O S
@@ -143,7 +150,7 @@ iore_time_t current_time();
  */
 #define WARN(MSG)					\
   do {							\
-    fprintf(stderr, "IORE WARNING: %s.\n", MSG);	\
+    fprintf(stderr, "IORE WARNING: %s.\n\n", MSG);	\
     fflush(stderr);					\
   } while(0)
 
@@ -153,7 +160,7 @@ iore_time_t current_time();
 #define WARNF(FMT, ...)				 \
   do {						 \
     FMTMSG(FMT, __VA_ARGS__);			 \
-    fprintf(stderr, "IORE WARNING: %s.\n", msg); \
+    fprintf(stderr, "IORE WARNING: %s.\n\n", msg); \
     fflush(stderr);				 \
   } while(0)
 

@@ -1,6 +1,9 @@
 #ifndef _IORE_AIO_H
 #define _IORE_AIO_H
 
+#include "iore_params.h"
+#include "util.h"
+
 /******************************************************************************
  * D E F I N I T I O N S
  ******************************************************************************/
@@ -26,6 +29,6 @@ typedef struct iore_aio
  * D E C L A R A T I O N S
  ******************************************************************************/
 
-iore_aio_t ioreaio_posix;
+iore_aio_t iore_aio_posix;
 
 #endif /* _IORE_AIO_H */

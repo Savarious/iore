@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <util.h>
+#include <iore_aio.h>
 
 /******************************************************************************
  * D E F I N I T I O N S
@@ -17,6 +18,9 @@ typedef struct iore_task
   verbosity_t verbosity; /* verbosity level */
   iore_time_t wclock_delta; /* time difference regarding master rank */
   iore_time_t wclock_skew_all; /* time difference across all tasks */
+  iore_time_t *timer[NUM_TIMERS]; /* performance timers for all repetitions */
+  iore_aio_t *aio_backend; /* abstract I/O implementation */
+  unsigned long long data_signature; /* data signature pattern */
 } iore_task_t;
 
 /******************************************************************************
