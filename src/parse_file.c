@@ -168,7 +168,11 @@ get_file_data (char *file_name)
       ERRF("No experiment definition found on file %s; aborting.", file_name);
       MPI_Abort(MPI_COMM_WORLD, -1);
     }
-
+  else
+    {
+      fseek(fp, 0, SEEK_SET);
+    }
+  
   data = (char *) malloc(length + 1); /* +1 to include string termination \0 */
   if (data == NULL)
     {
@@ -176,7 +180,7 @@ get_file_data (char *file_name)
       free(data);
       MPI_Abort(MPI_COMM_WORLD, -1);
     }
-  
+
   if (fread(data, length, 1, fp) != 1)
     {
       FATALF("Failed to read file %s contents.", file_name);
