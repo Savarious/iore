@@ -86,7 +86,7 @@ sync_rand_gen(MPI_Comm comm)
  * Considers base two units: KiB, MiB, GiB.
  */
 char *
-human_readable(iore_size_t size)
+human_readable(iore_size_t size, int precision)
 {
   char *size_str = (char *) malloc (MAX_STR_LEN * sizeof(char));
   
@@ -95,28 +95,28 @@ human_readable(iore_size_t size)
       if ((size % (iore_size_t) TEBIBYTE) == 0)
 	sprintf(size_str, "%lli TiB", (size / TEBIBYTE));
       else
-	sprintf(size_str, "%.3f TiB", ((double) size / TEBIBYTE));
+	sprintf(size_str, "%.*f TiB", precision, ((double) size / TEBIBYTE));
     }
   else if (size >= GIBIBYTE)
     {
       if ((size % (iore_size_t) GIBIBYTE) == 0)
 	sprintf(size_str, "%lli GiB", (size / GIBIBYTE));
       else
-	sprintf(size_str, "%.3f GiB", ((double) size / GIBIBYTE));
+	sprintf(size_str, "%.*f GiB", precision, ((double) size / GIBIBYTE));
     }
   else if (size >= MEBIBYTE)
     {
       if ((size % (iore_size_t) MEBIBYTE) == 0)
 	sprintf(size_str, "%lli MiB", (size / MEBIBYTE));
       else
-	sprintf(size_str, "%.3f MiB", ((double) size / MEBIBYTE));
+	sprintf(size_str, "%.*f MiB", precision, ((double) size / MEBIBYTE));
     }
   else if (size >= KIBIBYTE)
     {
       if ((size % (iore_size_t) KIBIBYTE) == 0)
 	sprintf(size_str, "%lli KiB", (size / KIBIBYTE));
       else
-	sprintf(size_str, "%.3f KiB", ((double) size / KIBIBYTE));
+	sprintf(size_str, "%.*f KiB", precision, ((double) size / KIBIBYTE));
     }
   else if (size >= 1)
     sprintf(size_str, "%f B", ((double) size));
@@ -124,7 +124,7 @@ human_readable(iore_size_t size)
     sprintf(size_str, "-");
 
   return (size_str);
-} /* human_readable(iore_size_t) */
+} /* human_readable(iore_size_t, int) */
 
 /*
  * Returns the path of the parent directory of the file/directory addressed by

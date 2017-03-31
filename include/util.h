@@ -86,7 +86,7 @@ enum timer
 char *current_time_str();
 iore_time_t current_time();
 void sync_rand_gen(MPI_Comm);
-char *human_readable(iore_size_t);
+char *human_readable(iore_size_t, int);
 char *get_parent_path(char *);
 
 /******************************************************************************

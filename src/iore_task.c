@@ -42,7 +42,7 @@ set_wclock_deviation (iore_task_t *task)
   iore_time_t max = 0;
   iore_time_t master_time;
   
-  MPI_TRYCATCH(MPI_Barrier(MPI_COMM_WORLD), "Failed tasks synchronization.");
+  MPI_TRYCATCH(MPI_Barrier(MPI_COMM_WORLD), "Failed syncing tasks.");
   time = MPI_Wtime();
   if (time < 0)
     FATAL("Failed to get timestamp using MPI_Wtime().");

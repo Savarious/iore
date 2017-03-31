@@ -23,10 +23,14 @@ static void finalize_mpi ();
 static void setup_mpi_comm (iore_params_t *);
 /* experiment execution related functions */
 static void exec_run (iore_run_t *);
+static void exec_repetition (int, iore_time_t, iore_params_t *);
+static void exec_write_test (int, iore_params_t *);
+static void exec_read_test (int, iore_params_t *);
 static void setup_run (iore_params_t *);
 static void setup_timers (int);
 static void bind_aio_backend (char *);
 static void setup_data_signature ();
+static char *get_file_name (iore_params_t *);
 
 /*****************************************************************************
  * G L O B A L S
@@ -199,19 +203,85 @@ static void
 exec_run (iore_run_t *run)
 {
   iore_params_t *params = &run->params;
+  iore_time_t deadline;
+  int i;
 
   setup_run(params);
+  deadline = current_time() + params->run_time_limit;
   display_run_info(run->id, params);
   
   /* only tasks participating in this run */
   if (task->comm != MPI_COMM_NULL)
     {
+      /* loop over run replications */
+      for (i = 0; i < params->num_repetitions; i++)
+	exec_repetition(i, deadline, params);
+      
       /* TODO: continue... */
     }
 
   /* TODO: cleanup run */
   
 } /* exec_run (iore_run_t *) */
+
+/*
+ * Execute a single iteration of an experiment run.
+ */
+static void
+exec_repetition (int r, iore_time_t deadline, iore_params_t *params)
+{
+  /* uses a different data signature for each iteration */
+  setup_data_signature();
+  
+  if (r == 0)
+    display_rep_header();
+
+  /* write performance test */
+  if (params->write_test &&
+      (params->run_time_limit == 0 || current_time() < deadline))
+    exec_write_test(r, params);
+
+  /* read performance test */
+  if (params->read_test &&
+      (params->run_time_limit == 0 || current_time() < deadline))
+    exec_read_test(r, params);
+
+  /* finalizing iteration */
+  if (!params->keep_file)
+    {
+      task->timer[D_START][r] = current_time();
+      /* TODO: remove file */
+      task->timer[D_STOP][r] = current_time();
+
+      MPI_TRYCATCH(MPI_Barrier(task->comm), "Failed syncing tasks.");
+
+      /* TODO: display remove results */
+    }
+} /* exec_repetition (int, iore_time_t deadline, iore_params_t *); */
+
+/*
+ * Execute a write performance test.
+ */
+static void
+exec_write_test (int r, iore_params_t *params)
+{
+  char *file_name;
+
+  file_name = get_file_name(params);
+} /* exec_write_test (int, iore_params_t *) */
+
+/*
+ * Execute a read performance test.
+ */
+static void
+exec_read_test (int r, iore_params_t *params)
+{
+  char *file_name;
+
+  /* TODO: setup rank offset */
+  
+  file_name = get_file_name(params);
+} /* exec_read_test (int, iore_params_t *) */
 
 /*
  * Prepare the execution of an experiment run.
@@ -226,7 +296,6 @@ setup_run (iore_params_t *params)
     {
       setup_timers(params->num_repetitions);
       bind_aio_backend(params->api);
-      setup_data_signature();
     }
 } /* setup_run (iore_params_t *) */
 
@@ -282,3 +351,27 @@ setup_data_signature ()
 
   task->data_signature = curtime;
 } /* setup_data_signature () */
+
+/*
+ * Returns the actual file name used for tests. It may include suffixes and
+ * prefixes depending on supplied parameters.
+ */
+static char *
+get_file_name (iore_params_t *params)
+{
+  char *file_name = (char *) malloc(MAX_STR_LEN * sizeof(char));
+  
+  if (params->sharing_policy == SHARED_FILE)
+    strcpy (file_name, params->root_file_name);
+  else
+    {
+      if (params->dir_per_file)
+	{
+	  /* TODO: continue... */
+	}
+    }
+
+  /* TODO: continue... */
+
+  return (file_name);
+} /* get_file_name (iore_params_t *) */

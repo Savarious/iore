@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h> /* environ */
 #include <sys/utsname.h> /* uname */
+#include <sys/param.h> /* MAXPATHLEN */
+#include <sys/statvfs.h>
 
 #include "display.h"
 #include "iore_task.h"
@@ -117,17 +119,12 @@ display_expt_header(int argc, char **argv)
 void
 display_run_info (int id, iore_params_t *params)
 {
-  char *dir;
-  
   if (task->verbosity >= NORMAL && task->rank == MASTER_RANK)
     {
       fprintf(stdout, "Test %d started: %s\n", id, current_time_str());
 
       if (task->verbosity >= VERY_VERBOSE)
-	{
-	  dir = get_parent_path(params->root_file_name);
-	  /* TODO: display file system free space */
-	}
+	display_fs_info(params->root_file_name);
 
       display_params(params);
 
@@ -165,15 +162,15 @@ display_params (iore_params_t *params)
 	      "SEQUENTIAL" : "RANDOM");
 
       fprintf(stdout, "\t%s = { %s", "block_sizes",
-	      human_readable(params->block_sizes[0]));
+	      human_readable(params->block_sizes[0], 2));
       for (i = 1; i < params->block_sizes_length; i++)
-	fprintf(stdout, ", %s", human_readable(params->block_sizes[i]));
+	fprintf(stdout, ", %s", human_readable(params->block_sizes[i], 2));
       fprintf(stdout, " }\n");
 
       fprintf(stdout, "\t%s = { %s", "transfer_sizes",
-	      human_readable(params->transfer_sizes[0]));
+	      human_readable(params->transfer_sizes[0], 2));
       for (i = 1; i < params->transfer_sizes_length; i++)
-	fprintf(stdout, ", %s", human_readable(params->transfer_sizes[i]));
+	fprintf(stdout, ", %s", human_readable(params->transfer_sizes[i], 2));
       fprintf(stdout, " }\n");
 
       if (params->write_test)
@@ -194,11 +191,11 @@ display_params (iore_params_t *params)
 	{
 	  fprintf(stdout, "\t%s = %d\n", "num_repetitions",
 		  params->num_repetitions);
-	  fprintf(stdout, "\t%s = %d s\n", "inter_test_delay",
+	  fprintf(stdout, "\t%s = %d sec\n", "inter_test_delay",
 		  params->inter_test_delay);
 	  fprintf(stdout, "\t%s = %s\n", "intra_test_barrier",
 		  (params->intra_test_barrier ? "true" : "false"));
-	  fprintf(stdout, "\t%s = %d m\n", "run_time_limit",
+	  fprintf(stdout, "\t%s = %d min\n", "run_time_limit",
 		  params->run_time_limit);
 	  fprintf(stdout, "\t%s = %s\n", "keep_file",
 		  (params->keep_file ? "true" : "false"));
@@ -222,3 +219,78 @@ display_params (iore_params_t *params)
       fflush(stdout);
     }
 } /* display_params (iore_params_t *) */
+
+/*
+ * Shows statistics about the file system.
+ */
+void
+display_fs_info (char *file_name)
+{
+  struct statvfs stat;
+  char *parent_dir;
+  char resolved_path[MAXPATHLEN];
+  long long int fs_size;
+  long long int fs_free;
+  long long int fs_used;
+  double fs_util;
+  long long int i_size;
+  long long int i_free;
+  long long int i_used;
+  double i_util;
+
+  if (task->verbosity >= NORMAL && task->rank == MASTER_RANK)
+    {
+      parent_dir = get_parent_path(file_name);
+
+      if (statvfs(parent_dir, &stat) == 0)
+	{
+	  /* expand symbolic links and references in path */
+	  if (realpath(parent_dir, resolved_path) == NULL)
+	    {
+	      WARN("Failed resolving parent dir path");
+	      strcpy(resolved_path, parent_dir);
+	    }
+	  
+	  /* blocks */
+	  fs_size = stat.f_blocks * stat.f_frsize;
+	  fs_free = stat.f_bfree * stat.f_frsize;
+	  fs_used = fs_size - fs_free;
+	  fs_util = ((double) fs_used / (double) fs_size) * 100;
+	  
+	  /* inodes */
+	  i_size = stat.f_files;
+	  i_free = stat.f_ffree;
+	  i_used = i_size - i_free;
+	  i_util = ((double) i_used / (double) i_size) * 100;
+	  
+	  fprintf(stdout, "Path: %s\n", resolved_path);
+	  fprintf(stdout, "\t%12s\t%12s\t%12s\t%s\n", "Size", "Free", "Used",
+		  "Used%");
+	  fprintf(stdout, "%s\t%12s\t%12s\t%12s\t%.1f%%\n", "FS",
+		  human_readable(fs_size, 0), human_readable(fs_free, 0),
+		  human_readable(fs_used, 0), fs_util);
+	  fprintf(stdout, "%s\t%12lli\t%12lli\t%12lli\t%.1f%%\n", "Inodes",
+		  i_size, i_free, i_used, i_util);
+	  fprintf(stdout, "\n");
+	  fflush(stdout);
+	}
+      else
+	{
+	  WARN("Failed obtaining file system statistics");
+	}
+    }
+} /* display_fs_info (char *) */
+
+/*
+ * Shows the header for results of repetitions of an experiment run.
+ */
+void
+display_rep_header()
+{
+  if (task->verbosity >= NORMAL && task->rank == MASTER_RANK)
+    {
+      fprintf(stdout, "%s %10s  %12s  %10s  %12s  %12s %5s\n", "access", "open(s)",
+	      "io(s)", "close(s)", "total(s)", "tput(MiB/s)", "iter");
+      fflush(stdout);
+    }
+} /* display_rep_header() */
