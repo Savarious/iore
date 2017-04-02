@@ -33,7 +33,7 @@ typedef struct iore_params
   int use_rep_in_file_name; /* use the repetition number in the file name */
   int dir_per_file; /* create an individual directory for each test file */
   int reorder_tasks; /* in read tests, a task reads offsets of other task */
-  int reorder_tasks_offset; /* distances in number of nodes for reordering */
+  int reorder_tasks_offset; /* distances in number of ranks for reordering */
 
   /* POSIX specific parameters */
   int single_io_attempt; /* do not retry a transfer if incomplete */

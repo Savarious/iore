@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h> /* environ */
+#include <unistd.h> /* environ, gethostname */
 #include <sys/utsname.h> /* uname */
 #include <sys/param.h> /* MAXPATHLEN */
 #include <sys/statvfs.h>
@@ -119,6 +119,8 @@ display_expt_header(int argc, char **argv)
 void
 display_run_info (int id, iore_params_t *params)
 {
+  char hostname[MAX_STR_LEN];
+  
   if (task->verbosity >= NORMAL && task->rank == MASTER_RANK)
     {
       fprintf(stdout, "Test %d started: %s\n", id, current_time_str());
@@ -129,9 +131,24 @@ display_run_info (int id, iore_params_t *params)
       display_params(params);
 
       fprintf(stdout, "Participating tasks: %d\n\n", params->num_tasks);
-      
-      fflush(stdout);
     }
+
+  if (task->verbosity >= VERY_VERBOSE)
+    {
+      MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed task syncing");
+
+      if (gethostname (hostname, MAX_STR_LEN) == 1)
+	{
+	  WARNF("Task %d failed to obtain the host name.", task->rank);
+	  strcpy(hostname, "UNKNOWN");
+	}
+
+      fprintf(stdout, "Task %d on %s\n", task->rank, hostname);
+    }
+  
+  fflush(stdout);
+
+  MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed task syncing");
 } /* display_run_info (int, iore_params_t *) */
 
 /*

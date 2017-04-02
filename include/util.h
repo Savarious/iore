@@ -83,11 +83,12 @@ enum timer
  * P R O T O T Y P E S
  ******************************************************************************/
 
-char *current_time_str();
-iore_time_t current_time();
-void sync_rand_gen(MPI_Comm);
-char *human_readable(iore_size_t, int);
-char *get_parent_path(char *);
+char *current_time_str ();
+iore_time_t current_time ();
+void sync_rand_gen (MPI_Comm);
+char *human_readable (iore_size_t, int);
+char *get_parent_path (char *);
+char *get_file_name (char *);
 
 /******************************************************************************
  * M A C R O S
@@ -157,11 +158,30 @@ char *get_parent_path(char *);
 /*
  * Formats and displays a warning message.
  */
-#define WARNF(FMT, ...)				 \
-  do {						 \
-    FMTMSG(FMT, __VA_ARGS__);			 \
+#define WARNF(FMT, ...)				   \
+  do {						   \
+    FMTMSG(FMT, __VA_ARGS__);			   \
     fprintf(stderr, "IORE WARNING: %s.\n\n", msg); \
-    fflush(stderr);				 \
+    fflush(stderr);				   \
+  } while(0)
+
+/*
+ * Displays a pre-formatted info message.
+ */
+#define INFO(MSG)				\
+  do {						\
+    fprintf(stdout, MSG);			\
+    fflush(stdout);				\
+  } while(0)
+
+/*
+ * Formats and displays an info message.
+ */
+#define INFOF(FMT, ...)				\
+  do {						\
+    FMTMSG(FMT, __VA_ARGS__);			\
+    fprintf(stdout, "%s", msg);			\
+    fflush(stdout);				\
   } while(0)
 
 /*

@@ -22,9 +22,9 @@ iore_task_t
   iore_task_t *task;
 
   task = (iore_task_t *) malloc(sizeof(iore_task_t));
+  task->comm = comm;
   task->nprocs = nprocs;
   task->rank = rank;
-  task->comm = comm;
   task->verbosity = NORMAL;
   task->wclock_delta = 0;
   task->wclock_skew_all = 0;

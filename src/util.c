@@ -26,7 +26,7 @@ char *
 current_time_str()
 {
   static time_t curtime;
-  char *curtimestr;
+  char *curtimestr = NULL;
 
   curtime = time (NULL);
   if (curtime == -1)
@@ -38,7 +38,7 @@ current_time_str()
 	FATAL("Failed to convert current time to string.");
     }
 
-  return curtimestr;
+  return (curtimestr);
 } /* current_time_str() */
 
 /*
@@ -153,9 +153,46 @@ get_parent_path(char *path)
     }
 
   if (!found)
-    parent[0] = '.';
-  
-  parent[i+1] = '\0';
+    {
+      parent[0] = '.';
+      parent[1] = '/';
+      parent[2] = '\0';
+    }
+  else
+    parent[i+1] = '\0';
 
   return (parent);
 } /* get_parent_path(char *) */
+
+/*
+ * Returns only the file name from the full path.
+ */
+char *
+get_file_name (char *path)
+{
+  int i;
+  char *file;
+  int found = FALSE;
+
+  file = (char *) malloc (MAXPATHLEN * sizeof(char));
+
+  /* ignores the last char to cope with path to directory ending with / */
+  i = strlen(path) - 1;
+  while (i > 0 && !found)
+    {
+      if (path[i] == '/' || path[i] == '.')
+	{
+	  file = path + (i + 1);
+	  found = TRUE;
+	}
+
+      i--;
+    }
+
+  if (!found)
+    file = path;
+  else
+    file[strlen(file)] = '\0';
+
+  return (file);
+} /* get_file_name (char *) */
