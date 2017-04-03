@@ -523,6 +523,7 @@ static char *
 get_test_file_name (iore_params_t *params, access_t access, int r)
 {
   char *file_name = (char *) malloc(MAX_STR_LEN * sizeof(char));
+  char *tmp = (char *) malloc(MAX_STR_LEN * sizeof(char)); 
   int pretend_rank;
   
   if (params->sharing_policy == SHARED_FILE)
@@ -532,12 +533,20 @@ get_test_file_name (iore_params_t *params, access_t access, int r)
       pretend_rank = get_pretend_rank (params, access);
       
       if (params->dir_per_file)
-	file_name = create_rank_dir (params->root_file_name, pretend_rank);
+	tmp = create_rank_dir (params->root_file_name, pretend_rank);
+      else
+	strcpy (tmp, params->root_file_name);
 
-      sprintf (file_name, "%s.%08d", file_name, pretend_rank);
+      sprintf (file_name, "%s.%08d", tmp, pretend_rank);
     }
 
-  sprintf (file_name, "%s.%d", file_name, r);
+  if (params->use_rep_in_file_name)
+    {
+      sprintf (tmp, "%s.%d", file_name, r);
+      strcpy (file_name, tmp);
+    }
+
+  free (tmp);
 
   return (file_name);
 } /* get_test_file_name (iore_params_t *, access_t, int) */
