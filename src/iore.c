@@ -30,7 +30,7 @@ static void exec_write_test (int, iore_params_t *);
 static void exec_read_test (int, iore_params_t *);
 static void setup_run (iore_params_t *);
 static void setup_timers (int);
-static void setup_io (access_t, iore_params_t *, iore_offset_t *, void *);
+static void setup_io (access_t, iore_params_t *, iore_offset_t **, void **);
 static void setup_buffer (access_t, int, void *);
 static void bind_aio_backend (char *);
 static void setup_data_signature ();
@@ -42,6 +42,7 @@ static iore_size_t perform_io (void *, access_t, iore_offset_t *, iore_size_t *,
 static void delay_secs (int);
 static iore_offset_t *get_sequential_offsets (int, iore_params_t *);
 static iore_offset_t *get_random_offsets (int, iore_params_t *);
+static int get_pretend_rank (iore_params_t *, access_t);
 
 /*****************************************************************************
  * G L O B A L S
@@ -294,13 +295,8 @@ exec_write_test (int r, iore_params_t *params)
   if (!params->use_existing_file)
     remove_file (params);
 
-  setup_io (WRITE, params, offsets, buf);
+  setup_io (WRITE, params, &offsets, &buf);
 
-  /* TODO: remove debug prints */
-  int i = 0;
-  while (offsets[i] != -1)
-    printf("rank %d; offsets[%d] = %lli\n", task->rank, i++, offsets[i]);
-  
   MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed syncing tasks");
 
   /* create and open the test file */
@@ -339,7 +335,7 @@ exec_read_test (int r, iore_params_t *params)
   
   delay_secs (params->inter_test_delay);
 
-  setup_io (READ, params, offsets, buf);
+  setup_io (READ, params, &offsets, &buf);
 
   MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed syncing tasks");
 
@@ -395,17 +391,13 @@ setup_timers (int num_repetitions)
  * Setup offsets and buffers for read and write tests.
  */
 static void
-setup_io (access_t access, iore_params_t *params, iore_offset_t *offsets,
-	  void *buf)
+setup_io (access_t access, iore_params_t *params, iore_offset_t **offsets,
+	  void **buf)
 {
   int pretend_rank;
   int i;
 
-  if (access == WRITE || !params->reorder_tasks)
-    pretend_rank = task->rank;
-  else /* READ and reorder_tasks */
-    pretend_rank =
-      (task->rank + params->reorder_tasks_offset) % params->num_tasks;
+  pretend_rank = get_pretend_rank (params, access);
 
   i = pretend_rank % params->block_sizes_length;
   task->block_size = params->block_sizes[i];
@@ -414,17 +406,11 @@ setup_io (access_t access, iore_params_t *params, iore_offset_t *offsets,
   task->transfer_size = params->transfer_sizes[i];
 
   if (params->access_pattern == SEQUENTIAL)
-    offsets = get_sequential_offsets (pretend_rank, params);
+    *offsets = get_sequential_offsets (pretend_rank, params);
   else /* RANDOM */
-    offsets = get_random_offsets (pretend_rank, params);
+    *offsets = get_random_offsets (pretend_rank, params);
 
-  setup_buffer (access, pretend_rank, buf);
-
-  /* TODO: remove debug prints */
-  i = 0;
-  while (offsets[i] != -1)
-    printf("rank %d; offsets[%d] = %lli\n", task->rank, i++, offsets[i]);
-  
+  setup_buffer (access, pretend_rank, *buf);
 } /* setup_io (access_t, iore_params_t *, iore_offset_t *, void *) */
 
 /*
@@ -505,11 +491,7 @@ get_test_file_name (iore_params_t *params, access_t access, int r)
     strcpy (file_name, params->root_file_name);
   else
     { /* FILE_PER_PROCESS */
-      if (access == WRITE || !params->reorder_tasks)
-	pretend_rank = task->rank;
-      else /* READ and reorder_tasks */
-	pretend_rank =
-	  (task->rank + params->reorder_tasks_offset) % params->num_tasks;
+      pretend_rank = get_pretend_rank (params, access);
       
       if (params->dir_per_file)
 	file_name = create_rank_dir (params->root_file_name, pretend_rank);
@@ -582,16 +564,14 @@ perform_io (void *fd, access_t access, iore_offset_t *offsets, iore_size_t *buf,
   iore_size_t size;
   int i = 0;
 
-  printf("offsets[0] = %lli", offsets[0]);
-  
   while (offsets[i] != -1)
     {
       if (task->verbosity >= DEBUG)
 	{
 	  if (access == WRITE)
-	    INFOF("Task %d writing to offset %lli", task->rank, offsets[i]);
+	    INFOF("Task %d writing to offset %lli\n", task->rank, offsets[i]);
 	  else
-	    INFOF("Task %d reading from offset %lli", task->rank, offsets[i]);
+	    INFOF("Task %d reading from offset %lli\n", task->rank, offsets[i]);
 	}
 
       size = task->transfer_size >= remaining ? remaining : task->transfer_size;
@@ -603,6 +583,8 @@ perform_io (void *fd, access_t access, iore_offset_t *offsets, iore_size_t *buf,
 	    FATAL("Failed to write to file");
 	  else
 	    FATAL("Failed to read from file");
+
+	  MPI_Abort(MPI_COMM_WORLD, -1);
 	}
       else
 	{
@@ -758,3 +740,21 @@ get_random_offsets (int rank, iore_params_t *params)
 
   return (offsets);
 } /* get_random_offsets (int, iore_params_t *) */
+
+/*
+ * Returns an alternative rank for read tests, so a task can read a file not in
+ * its own node's cache.
+ */
+static int
+get_pretend_rank (iore_params_t *params, access_t access)
+{
+  int pretend_rank;
+
+  if (access == WRITE || !params->reorder_tasks)
+    pretend_rank = task->rank;
+  else /* READ and reorder_tasks */
+    pretend_rank =
+      (task->rank + params->reorder_tasks_offset) % params->num_tasks;
+
+  return (pretend_rank);
+} /* get_pretend_rank (iore_params_t *, access_t access) */
