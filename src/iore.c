@@ -31,6 +31,7 @@ static void exec_read_test (int, iore_params_t *);
 static void setup_run (iore_params_t *);
 static void setup_timers (int);
 static void setup_io (access_t, iore_params_t *, iore_offset_t **, void **);
+static void cleanup_io (iore_offset_t **, void **);
 static void setup_buffer (access_t, int, void *);
 static void bind_aio_backend (char *);
 static void setup_data_signature ();
@@ -223,6 +224,7 @@ exec_run (iore_run_t *run)
   /* only tasks participating in this run */
   if (task->comm != MPI_COMM_NULL)
     {
+      task->run_id = run->id;
       deadline = current_time() + params->run_time_limit;
       display_run_info(run->id, params);
 
@@ -283,7 +285,6 @@ exec_write_test (int r, iore_params_t *params)
   iore_offset_t *offsets = NULL;
   void *buf = NULL;
   void *fd;
-  iore_size_t data_moved = 0;
 
   file_name = get_test_file_name (params, WRITE, r);
   if (task->verbosity >= VERY_VERBOSE)
@@ -312,8 +313,25 @@ exec_write_test (int r, iore_params_t *params)
 
   /* write file */
   task->timer[W_START][r] = current_time ();
-  data_moved = perform_io (fd, WRITE, offsets, buf, params);
+  task->data_moved[WRITE][r] = perform_io (fd, WRITE, offsets, buf, params);
   task->timer[W_STOP][r] = current_time ();
+
+  if (params->intra_test_barrier)
+    MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed syncing tasks");
+
+  /* close the test file */
+  task->timer[W_CLOSE_START][r] = current_time();
+  task->aio_backend->close (fd, params);
+  task->timer[W_CLOSE_STOP][r] = current_time();
+
+  cleanup_io (&offsets, &buf);
+
+  MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed syncing tasks");
+
+  if (task->verbosity >= DEBUG)
+    display_per_task_results (WRITE, r);
+
+  display_test_results (WRITE, r);
 } /* exec_write_test (int, iore_params_t *) */
 
 /*
@@ -326,7 +344,6 @@ exec_read_test (int r, iore_params_t *params)
   iore_offset_t *offsets = NULL;
   void *buf = NULL;
   void *fd;
-  iore_size_t data_moved = 0;
 
   file_name = get_test_file_name (params, READ, r);
   if (task->verbosity >= VERY_VERBOSE)
@@ -352,8 +369,25 @@ exec_read_test (int r, iore_params_t *params)
 
   /* read file */
   task->timer[R_START][r] = current_time ();
-  data_moved = perform_io (fd, READ, offsets, buf, params);
+  task->data_moved[READ][r] = perform_io (fd, READ, offsets, buf, params);
   task->timer[R_STOP][r] = current_time ();
+
+  if (params->intra_test_barrier)
+    MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed syncing tasks");
+
+  /* close the test file */
+  task->timer[R_CLOSE_START][r] = current_time();
+  task->aio_backend->close (fd, params);
+  task->timer[R_CLOSE_STOP][r] = current_time();
+
+  cleanup_io (&offsets, &buf);
+
+  MPI_TRYCATCH(MPI_Barrier (task->comm), "Failed syncing tasks");
+
+  if (task->verbosity >= DEBUG)
+    display_per_task_results (READ, r);
+
+  display_test_results (READ, r);
 } /* exec_read_test (int, iore_params_t *) */
 
 /*
@@ -412,6 +446,16 @@ setup_io (access_t access, iore_params_t *params, iore_offset_t **offsets,
 
   setup_buffer (access, pretend_rank, *buf);
 } /* setup_io (access_t, iore_params_t *, iore_offset_t *, void *) */
+
+/*
+ * Deallocate the memory used for file offsets and I/O buffers.
+ */
+static void
+cleanup_io (iore_offset_t **offsets, void **buf)
+{
+  free (*offsets);
+  free (*buf);
+} /* cleanup_io (iore_offset_t **, void **) */
 
 /*
  * Setup the buffer for read and write tests.

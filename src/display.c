@@ -4,6 +4,7 @@
 #include <sys/utsname.h> /* uname */
 #include <sys/param.h> /* MAXPATHLEN */
 #include <sys/statvfs.h>
+#include <mpi.h>
 
 #include "display.h"
 #include "iore_task.h"
@@ -306,8 +307,167 @@ display_rep_header()
 {
   if (task->verbosity >= NORMAL && task->rank == MASTER_RANK)
     {
-      fprintf(stdout, "%s %10s  %12s  %10s  %12s  %12s %5s\n", "access", "open(s)",
-	      "io(s)", "close(s)", "total(s)", "tput(MiB/s)", "iter");
+      fprintf(stdout, "%s %10s  %12s  %10s  %12s  %12s %5s\n", "access",
+	      "open(s)","io(s)", "close(s)", "total(s)", "tput(MiB/s)", "iter");
       fflush(stdout);
     }
 } /* display_rep_header() */
+
+/*
+ * Shows the summary results of a single repetition of a read/write test.
+ */
+void
+display_test_results (access_t access, int r)
+{
+  iore_time_t summary[R_CLOSE_STOP + 1] = { 0 };
+  iore_size_t data_moved = 0;
+  MPI_Op op;
+  int i;
+
+  if (task->verbosity >= NORMAL)
+    {
+      if (access == WRITE)
+	{
+	  /* find the minimum time for each even numbered timer (start timers),
+	     and the maximum time for each odd numbered timer (stop timers) */
+	  for (i = W_OPEN_START; i <= W_CLOSE_STOP; i++)
+	    {
+	      op = i % 2 == 0 ? MPI_MIN : MPI_MAX;
+	      MPI_TRYCATCH(MPI_Reduce (&task->timer[i][r], &summary[i], 1,
+				       MPI_DOUBLE, op, MASTER_RANK,
+				       task->comm),
+			   "Failed to summarize write test results");
+	    }
+
+	  /* compute the total amount of data moved in the test */
+	  MPI_TRYCATCH(MPI_Reduce (&task->data_moved[WRITE][r], &data_moved,
+				   1, MPI_LONG_LONG_INT, MPI_SUM, MASTER_RANK,
+				   task->comm),
+		       "Failed to summarize write test results");
+
+	  if (task->rank == MASTER_RANK)
+	    {
+	      fprintf (stdout, "%s %6.3f  %8.3f  %6.3f  %8.3f  %8.3f %5d\n",
+		       "write",
+		       summary[W_OPEN_STOP] - summary[W_OPEN_START],
+		       summary[W_STOP] - summary[W_START],
+		       summary[W_CLOSE_STOP] - summary[W_CLOSE_START],
+		       summary[W_CLOSE_STOP] - summary[W_OPEN_START],
+		       (((double)(data_moved / MEBIBYTE)) /
+			(summary[W_CLOSE_STOP] - summary[W_OPEN_START])),
+		       r);
+	      fflush (stdout);
+	    }
+	}
+      else /* READ */
+	{
+	  /* find the minimum time for each even numbered timer (start timers),
+	     and the maximum time for each odd numbered timer (stop timers) */
+	  for (i = R_OPEN_START; i <= R_CLOSE_STOP; i++)
+	    {
+	      op = i % 2 == 0 ? MPI_MIN : MPI_MAX;
+	      MPI_TRYCATCH(MPI_Reduce (&task->timer[i][r], &summary[i], 1,
+				       MPI_DOUBLE, op, MASTER_RANK,
+				       task->comm),
+			   "Failed to summarize read test results");
+	    }
+
+	  /* compute the total amount of data moved in the test */
+	  MPI_TRYCATCH(MPI_Reduce (&task->data_moved[READ][r], &data_moved,
+				   1, MPI_LONG_LONG_INT, MPI_SUM, MASTER_RANK,
+				   task->comm),
+		       "Failed to summarize read test results");
+
+	  if (task->rank == MASTER_RANK)
+	    {
+	      fprintf (stdout, "%s %6.3f  %8.3f  %6.3f  %8.3f  %8.3f %5d\n",
+		       "write",
+		       summary[R_OPEN_STOP] - summary[R_OPEN_START],
+		       summary[R_STOP] - summary[R_START],
+		       summary[R_CLOSE_STOP] - summary[R_CLOSE_START],
+		       summary[R_CLOSE_STOP] - summary[R_OPEN_START],
+		       (((double)(data_moved / MEBIBYTE)) /
+			(summary[R_CLOSE_STOP] - summary[R_OPEN_START])),
+		       r);
+	      fflush (stdout);
+	    }
+	}
+    }
+} /* display_test_results (access_t, int) */
+
+/*
+ * Shows timing results for each operation and task.
+ *
+ * IMPORTANT: it is supposed to be used only at a DEBUG verbosity level due to 
+ * the large amount of output that can be generated. This condition is not 
+ * verified inside the function to avoid duplicated comparison since it becomes
+ * more semantic to verify this in the execution flow, before calling the 
+ * function.
+ */
+void
+display_per_task_results (access_t access, int r)
+{
+  char access_desc[MAX_STR_LEN];
+  char timer_desc[MAX_STR_LEN];
+  int i, first, last;
+  
+  if (access == WRITE)
+    {
+      strcpy (access_desc, "write");
+      first = W_OPEN_START;
+      last = W_CLOSE_STOP;
+    }
+  else /* READ */
+    {
+      strcpy (access_desc, "read");
+      first = R_OPEN_START;
+      last = R_CLOSE_STOP;
+    }
+
+  for (i = first; i <= last; i++)
+    {
+      switch (i)
+	{
+	case W_OPEN_START:
+	  strcpy (timer_desc, "write open start");
+	  break;
+	case W_OPEN_STOP:
+	  strcpy (timer_desc, "write open stop");
+	  break;
+	case W_START:
+	  strcpy (timer_desc, "write start");
+	  break;
+	case W_STOP:
+	  strcpy (timer_desc, "write stop");
+	  break;
+	case W_CLOSE_START:
+	  strcpy (timer_desc, "write close start");
+	  break;
+	case W_CLOSE_STOP:
+	  strcpy (timer_desc, "write close stop");
+	  break;
+	case R_OPEN_START:
+	  strcpy (timer_desc, "read open start");
+	  break;
+	case R_OPEN_STOP:
+	  strcpy (timer_desc, "read open stop");
+	  break;
+	case R_START:
+	  strcpy (timer_desc, "read start");
+	  break;
+	case R_STOP:
+	  strcpy (timer_desc, "read stop");
+	  break;
+	case R_CLOSE_START:
+	  strcpy (timer_desc, "read close start");
+	  break;
+	case R_CLOSE_STOP:
+	  strcpy (timer_desc, "read close stop");
+	  break;
+	}
+
+      fprintf (stdout, "Run %d: Iter=%d, Task=%d, Time=%f, %s\n",
+	       task->run_id, r, task->rank, task->timer[i][r], timer_desc);
+      fflush (stdout);
+    }
+} /* display_per_task_results (access_t, int) */
