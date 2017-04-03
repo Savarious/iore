@@ -22,7 +22,8 @@ typedef struct iore_aio
   void
   (*delete) (iore_params_t *);
   iore_size_t
-  (*io) (void *, iore_size_t *, iore_size_t, access_t, iore_params_t *);
+  (*io) (void *, iore_size_t *, iore_size_t, iore_offset_t, access_t,
+	 iore_params_t *);
 } iore_aio_t;
 
 /******************************************************************************

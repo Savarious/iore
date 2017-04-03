@@ -321,6 +321,7 @@ display_test_results (access_t access, int r)
 {
   iore_time_t summary[R_CLOSE_STOP + 1] = { 0 };
   iore_size_t data_moved = 0;
+  char *format = "%s %10.4f  %12.4f  %10.4f  %12.4f  %12.4f %5d\n";
   MPI_Op op;
   int i;
 
@@ -347,8 +348,7 @@ display_test_results (access_t access, int r)
 
 	  if (task->rank == MASTER_RANK)
 	    {
-	      fprintf (stdout, "%s %6.3f  %8.3f  %6.3f  %8.3f  %8.3f %5d\n",
-		       "write",
+	      fprintf (stdout, format, "write",
 		       summary[W_OPEN_STOP] - summary[W_OPEN_START],
 		       summary[W_STOP] - summary[W_START],
 		       summary[W_CLOSE_STOP] - summary[W_CLOSE_START],
@@ -380,8 +380,7 @@ display_test_results (access_t access, int r)
 
 	  if (task->rank == MASTER_RANK)
 	    {
-	      fprintf (stdout, "%s %6.3f  %8.3f  %6.3f  %8.3f  %8.3f %5d\n",
-		       "write",
+	      fprintf (stdout, format, "read",
 		       summary[R_OPEN_STOP] - summary[R_OPEN_START],
 		       summary[R_STOP] - summary[R_START],
 		       summary[R_CLOSE_STOP] - summary[R_CLOSE_START],

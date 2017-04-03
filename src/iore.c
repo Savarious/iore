@@ -29,10 +29,9 @@ static void exec_repetition (int, iore_time_t, iore_params_t *);
 static void exec_write_test (int, iore_params_t *);
 static void exec_read_test (int, iore_params_t *);
 static void setup_run (iore_params_t *);
-static void setup_timers (int);
+static void setup_perf_collectors (int);
 static void setup_io (access_t, iore_params_t *, iore_offset_t **, void **);
 static void cleanup_io (iore_offset_t **, void **);
-static void setup_buffer (access_t, int, void *);
 static void bind_aio_backend (char *);
 static void setup_data_signature ();
 static char *get_test_file_name (iore_params_t *, access_t, int);
@@ -43,6 +42,7 @@ static iore_size_t perform_io (void *, access_t, iore_offset_t *, iore_size_t *,
 static void delay_secs (int);
 static iore_offset_t *get_sequential_offsets (int, iore_params_t *);
 static iore_offset_t *get_random_offsets (int, iore_params_t *);
+static void *get_buffer (access_t, int);
 static int get_pretend_rank (iore_params_t *, access_t);
 
 /*****************************************************************************
@@ -401,7 +401,7 @@ setup_run (iore_params_t *params)
   /* only tasks participating in this run */
   if (task->comm != MPI_COMM_NULL)
     {
-      setup_timers(params->num_repetitions);
+      setup_perf_collectors(params->num_repetitions);
       bind_aio_backend(params->api);
     }
 } /* setup_run (iore_params_t *) */
@@ -410,16 +410,36 @@ setup_run (iore_params_t *params)
  * Reset performance timers to collect results from an experiment run.
  */ 
 static void
-setup_timers (int num_repetitions)
+setup_perf_collectors (int num_repetitions)
 {
   int i;
   for (i = 0; i < NUM_TIMERS; i++)
     {
-      task->timer[i] = (double *) malloc(num_repetitions * sizeof(iore_time_t));
+      task->timer[i] = (iore_time_t *)
+	malloc(num_repetitions * sizeof(iore_time_t));
       if (task->timer[i] == NULL)
-	FATAL("Failed to setup performance timers.");
+	{
+	  FATAL("Failed to setup performance timers");
+	  MPI_Abort(MPI_COMM_WORLD, -1);
+	}
     }
-} /* setup_timers (int) */
+
+  task->data_moved[READ] = (iore_size_t *)
+    malloc (num_repetitions * sizeof (iore_size_t));
+  if (task->data_moved[READ] == NULL)
+    {
+      FATAL("Failed to setup data moved collector");
+      MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
+  task->data_moved[WRITE] = (iore_size_t *)
+    malloc (num_repetitions * sizeof (iore_size_t));
+  if (task->data_moved[WRITE] == NULL)
+    {
+      FATAL("Failed to setup data moved collector");
+      MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+} /* setup_perf_collectors (int) */
 
 /*
  * Setup offsets and buffers for read and write tests.
@@ -444,7 +464,7 @@ setup_io (access_t access, iore_params_t *params, iore_offset_t **offsets,
   else /* RANDOM */
     *offsets = get_random_offsets (pretend_rank, params);
 
-  setup_buffer (access, pretend_rank, *buf);
+  *buf = get_buffer (access, pretend_rank);
 } /* setup_io (access_t, iore_params_t *, iore_offset_t *, void *) */
 
 /*
@@ -456,32 +476,6 @@ cleanup_io (iore_offset_t **offsets, void **buf)
   free (*offsets);
   free (*buf);
 } /* cleanup_io (iore_offset_t **, void **) */
-
-/*
- * Setup the buffer for read and write tests.
- */
-static void
-setup_buffer (access_t access, int rank, void *buffer)
-{
-  unsigned long long even, odd;
-  unsigned long long *buf;
-  size_t i;
-  
-  buffer = malloc (task->transfer_size);
-  if (buffer == NULL)
-    FATAL("Failed to allocate memory for the I/O buffer");
-
-  if (access == WRITE)
-    {
-      /* fill buffer */
-      buf = (unsigned long long *) buffer;
-      even = (unsigned long long) rank;
-      odd = task->data_signature;
-
-      for (i = 0; i < (task->transfer_size / sizeof(unsigned long long)); i++)
-	buf[i] = (i % 2) == 0 ? even : odd;
-    }
-} /* setup_buffer (access_t, int, void *) */
 
 /*
  * Bind an abstract I/O implementation to the backend.
@@ -613,14 +607,15 @@ perform_io (void *fd, access_t access, iore_offset_t *offsets, iore_size_t *buf,
       if (task->verbosity >= DEBUG)
 	{
 	  if (access == WRITE)
-	    INFOF("Task %d writing to offset %lli\n", task->rank, offsets[i]);
+	    INFOF("Task %d writing to offset %lld\n", task->rank, offsets[i]);
 	  else
-	    INFOF("Task %d reading from offset %lli\n", task->rank, offsets[i]);
+	    INFOF("Task %d reading from offset %lld\n", task->rank, offsets[i]);
 	}
 
       size = task->transfer_size >= remaining ? remaining : task->transfer_size;
 
-      transferred = task->aio_backend->io (fd, buf, size, access, params);
+      transferred = task->aio_backend->io (fd, buf, size, offsets[i], access,
+					   params);
       if (transferred != size)
 	{
 	  if (access == WRITE)
@@ -784,6 +779,33 @@ get_random_offsets (int rank, iore_params_t *params)
 
   return (offsets);
 } /* get_random_offsets (int, iore_params_t *) */
+
+/*
+ * Setup the buffer for read and write tests.
+ */
+static void *
+get_buffer (access_t access, int rank)
+{
+  unsigned long long *buf;
+  unsigned long long even, odd;
+  size_t i;
+  
+  buf = malloc (task->transfer_size);
+  if (buf == NULL)
+    FATAL("Failed to allocate memory for the I/O buffer");
+
+  if (access == WRITE)
+    {
+      /* fill buffer */
+      even = (unsigned long long) rank;
+      odd = task->data_signature;
+
+      for (i = 0; i < (task->transfer_size / sizeof(unsigned long long)); i++)
+	buf[i] = (i % 2) == 0 ? even : odd;
+    }
+
+  return (buf);
+} /* get_buffer (access_t, int) */
 
 /*
  * Returns an alternative rank for read tests, so a task can read a file not in

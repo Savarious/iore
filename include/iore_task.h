@@ -20,7 +20,7 @@ typedef struct iore_task
   iore_time_t wclock_delta; /* time difference regarding master rank */
   iore_time_t wclock_skew_all; /* time difference across all tasks */
   iore_time_t *timer[NUM_TIMERS]; /* performance timers for all repetitions */
-  iore_time_t *data_moved[2]; /* amount of data moved in read/write tests */
+  iore_size_t *data_moved[2]; /* amount of data moved in read/write tests */
   iore_aio_t *aio_backend; /* abstract I/O implementation */
   unsigned long long data_signature; /* data signature pattern */
   char *test_file_name; /* full path of the test file */
