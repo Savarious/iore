@@ -18,7 +18,6 @@
 static char *get_file_data (char *);
 static void parse_file_run (json_value *, iore_run_t *);
 static void parse_file_params (json_value *, iore_params_t *);
-static iore_size_t string_to_bytes (char *);
 
 /******************************************************************************
  * F U N C T I O N S
@@ -658,42 +657,3 @@ parse_file_params (json_value *params, iore_params_t *iore_params)
     }
 } /* parse_file_params (json_value *, iore_params_t *) */
 
-/*
- * Converts a string of the form 2, 4k, 8K, 16m, 32m, 64g, 128G into bytes.
- * Considers base two units.
- */
-static iore_size_t
-string_to_bytes (char *size_str)
-{
-  iore_size_t size = 0;
-  char unit;
-  int n;
-
-  n = sscanf(size_str, "%lld%c", &size, &unit);
-  if (n == 2)
-    {
-      switch ((int) unit)
-	{
-	case 'k':
-	case 'K':
-	  size <<= 10;
-	  break;
-	case 'm':
-	case 'M':
-	  size <<= 20;
-	  break;
-	case 'g':
-	case 'G':
-	  size <<= 30;
-	  break;
-	default:
-	  size = -1;
-	}
-    }
-  else if (n == 0)
-    {
-      size = -1;
-    }
-
-  return (size);
-} /* string_to_bytes (char *) */

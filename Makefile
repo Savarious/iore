@@ -13,7 +13,7 @@ export CC = mpicc
 export CFLAGS += -I $(INCDIR)
 export CFLAGS += -Wall -Wextra
 export CFLAGS += -lm
-export CFLAGS += -DUSE_POSIX_AIO -DMETA_VERSION=$(VERSION)
+export CFLAGS += -DUSE_POSIX_AIO -DUSE_MPIIO_AIO -DMETA_VERSION=$(VERSION)
 
 # Executable file
 export EXEC = iore

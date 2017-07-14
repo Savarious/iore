@@ -31,5 +31,6 @@ typedef struct iore_aio
  ******************************************************************************/
 
 iore_aio_t iore_aio_posix;
+iore_aio_t iore_aio_mpiio;
 
 #endif /* _IORE_AIO_H */

@@ -89,6 +89,7 @@ void sync_rand_gen (MPI_Comm);
 char *human_readable (iore_size_t, int);
 char *get_parent_path (char *);
 char *get_file_name (char *);
+iore_size_t string_to_bytes (char *size_str);
 
 /******************************************************************************
  * M A C R O S

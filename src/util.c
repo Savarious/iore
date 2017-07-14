@@ -196,3 +196,43 @@ get_file_name (char *path)
 
   return (file);
 } /* get_file_name (char *) */
+
+/*
+ * Converts a string of the form 2, 4k, 8K, 16m, 32m, 64g, 128G into bytes.
+ * Considers base two units.
+ */
+iore_size_t
+string_to_bytes (char *size_str)
+{
+  iore_size_t size = 0;
+  char unit;
+  int n;
+
+  n = sscanf(size_str, "%lld%c", &size, &unit);
+  if (n == 2)
+    {
+      switch ((int) unit)
+  {
+  case 'k':
+  case 'K':
+    size <<= 10;
+    break;
+  case 'm':
+  case 'M':
+    size <<= 20;
+    break;
+  case 'g':
+  case 'G':
+    size <<= 30;
+    break;
+  default:
+    size = -1;
+  }
+    }
+  else if (n == 0)
+    {
+      size = -1;
+    }
+
+  return (size);
+} /* string_to_bytes (char *) */

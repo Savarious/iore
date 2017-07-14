@@ -58,11 +58,15 @@ iore_task_t *task;
 
 /* I/O APIs available */
 static iore_aio_t *available_aio[] = {
+#ifdef USE_MPIIO_AIO
+  &iore_aio_mpiio,
+#endif
 #ifdef USE_POSIX_AIO
   &iore_aio_posix,
 #endif
   NULL
 };
+
 
 /*****************************************************************************
  * M A I N                                                                   
